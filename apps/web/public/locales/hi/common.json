@@ -1,0 +1,53 @@
+{
+  "nav": {
+    "home": "होम",
+    "dashboard": "डैशबोर्ड", 
+    "incidents": "घटनाएं",
+    "zones": "क्षेत्र",
+    "audit": "ऑडिट",
+    "settings": "सेटिंग्स",
+    "logout": "लॉगआउट"
+  },
+  "buttons": {
+    "sos": "आपातकाल",
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "delete": "हटाएं",
+    "edit": "संपादित करें",
+    "create": "बनाएं",
+    "close": "बंद करें",
+    "acknowledge": "स्वीकार करें",
+    "verify": "सत्यापित करें",
+    "import": "आयात करें"
+  },
+  "status": {
+    "open": "खुला",
+    "acknowledged": "स्वीकृत", 
+    "closed": "बंद",
+    "active": "सक्रिय",
+    "inactive": "निष्क्रिय"
+  },
+  "zones": {
+    "safe": "सुरक्षित क्षेत्र",
+    "restricted": "प्रतिबंधित क्षेत्र",
+    "alert": "चेतावनी क्षेत्र"
+  },
+  "incidents": {
+    "sos": "आपातकालीन अलर्ट",
+    "immobile": "स्थिर",
+    "restricted": "प्रतिबंधित क्षेत्र",
+    "deviation": "मार्ग विचलन"
+  },
+  "severity": {
+    "low": "कम",
+    "medium": "मध्यम", 
+    "high": "उच्च"
+  },
+  "messages": {
+    "welcome": "TourSafe में आपका स्वागत है",
+    "vcImported": "प्रमाण-पत्र सफलतापूर्वक आयात किया गया",
+    "sosTriggered": "आपातकालीन अलर्ट भेजा गया",
+    "locationRequired": "स्थान एक्सेस आवश्यक है",
+    "geofenceWarning": "चेतावनी: आप एक प्रतिबंधित क्षेत्र के पास जा रहे हैं"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "nav": {
+    "home": "Home",
+    "dashboard": "Dashboard", 
+    "incidents": "Incidents",
+    "zones": "Zones",
+    "audit": "Audit",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "buttons": {
+    "sos": "SOS",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "close": "Close",
+    "acknowledge": "Acknowledge",
+    "verify": "Verify",
+    "import": "Import"
+  },
+  "status": {
+    "open": "Open",
+    "acknowledged": "Acknowledged", 
+    "closed": "Closed",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "zones": {
+    "safe": "Safe Zone",
+    "restricted": "Restricted Zone",
+    "alert": "Alert Zone"
+  },
+  "incidents": {
+    "sos": "SOS Alert",
+    "immobile": "Immobile",
+    "restricted": "Restricted Area",
+    "deviation": "Route Deviation"
+  },
+  "severity": {
+    "low": "Low",
+    "medium": "Medium", 
+    "high": "High"
+  },
+  "messages": {
+    "welcome": "Welcome to TourSafe",
+    "vcImported": "Credential imported successfully",
+    "sosTriggered": "Emergency alert sent",
+    "locationRequired": "Location access required",
+    "geofenceWarning": "Warning: You are approaching a restricted area"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@toursafe/config",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "devDependencies": {
+    "@types/eslint": "^8.56.2",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  }
+}
