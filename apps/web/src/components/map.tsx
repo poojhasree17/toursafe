@@ -24,21 +24,24 @@ interface MapProps {
   onLocationUpdate?: (lat: number, lng: number) => void;
   showSOS?: boolean;
   onSOSClick?: () => void;
+  isTracking?: boolean;
+  onTrackingToggle?: () => void;
 }
 
-export function TourSafeMap({ 
+export function TourSafeMap({
   center = [72.8347, 18.9220], // Mumbai coordinates
   zoom = 14,
   zones = [],
   userLocation,
   onLocationUpdate,
   showSOS = false,
-  onSOSClick
+  onSOSClick,
+  isTracking = false,
+  onTrackingToggle
 }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const userMarker = useRef<maplibregl.Marker | null>(null);
-  const [watchId, setWatchId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -216,6 +219,7 @@ export function TourSafeMap({
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
+        console.log('📍 Manual location update:', { latitude, longitude });
         addUserMarker(longitude, latitude);
         onLocationUpdate?.(latitude, longitude);
         toast.success('Location updated');
@@ -225,45 +229,11 @@ export function TourSafeMap({
         toast.error('Failed to get location');
       },
       {
-        enableHighAccuracy: true,
+        enableHighAccuracy: false, // More stable location
         timeout: 10000,
-        maximumAge: 60000
+        maximumAge: 120000 // Cache for 2 minutes
       }
     );
-  };
-
-  const startLocationTracking = () => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported');
-      return;
-    }
-
-    if (watchId) {
-      navigator.geolocation.clearWatch(watchId);
-      setWatchId(null);
-      toast.success('Location tracking stopped');
-      return;
-    }
-
-    const id = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        addUserMarker(longitude, latitude);
-        onLocationUpdate?.(latitude, longitude);
-      },
-      (error) => {
-        console.error('Location tracking error:', error);
-        toast.error('Location tracking failed');
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 30000,
-        maximumAge: 30000
-      }
-    );
-
-    setWatchId(id);
-    toast.success('Location tracking started');
   };
 
   return (
@@ -282,10 +252,10 @@ export function TourSafeMap({
         </Button>
         
         <Button
-          variant={watchId ? "destructive" : "secondary"}
+          variant={isTracking ? "destructive" : "secondary"}
           size="icon"
-          onClick={startLocationTracking}
-          title={watchId ? "Stop tracking" : "Start location tracking"}
+          onClick={onTrackingToggle}
+          title={isTracking ? "Stop tracking" : "Start location tracking"}
         >
           <Shield className="h-4 w-4" />
         </Button>

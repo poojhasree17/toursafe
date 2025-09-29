@@ -60,7 +60,8 @@ export async function POST(request: NextRequest) {
           txHash: tourist.chain_tx_hash,
           matched: chainResult.onChainProof.matched,
           blockNumber: chainResult.onChainProof.blockNumber,
-          timestamp: chainResult.onChainProof.timestamp
+          timestamp: chainResult.onChainProof.timestamp,
+          error: undefined
         };
       } catch (chainError) {
         console.error('Chain verification failed:', chainError);

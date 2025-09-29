@@ -5,8 +5,11 @@
   "scripts": {
     "seed": "tsx seed.ts",
     "simulate": "tsx simulate-tourist.ts",
+    "simulate-incidents": "tsx simulate-incidents.ts",
     "test-vc": "tsx test-vc.ts",
-    "test-chain": "tsx test-chain.ts"
+    "test-chain": "tsx test-chain.ts",
+    "demo": "tsx demo-runner.ts",
+    "test-demo": "tsx test-demo.ts"
   },
   "dependencies": {
     "@toursafe/lib": "workspace:*",

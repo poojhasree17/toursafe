@@ -170,8 +170,10 @@ No additional environment variables needed for AI service.
    NEXT_PUBLIC_FIREBASE_PROJECT_ID=toursafe-demo
    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
    NEXT_PUBLIC_FIREBASE_APP_ID=...
-   FIREBASE_SERVER_KEY=... (for server-side)
+   NEXT_PUBLIC_FIREBASE_VAPID_KEY=...
    ```
+   
+   **Note:** `FIREBASE_SERVER_KEY` is deprecated. Instead, place your Firebase service account JSON file as `travel-safety.json` in the web app root directory.
 
 ## 7. ✅ Verification Checklist
 

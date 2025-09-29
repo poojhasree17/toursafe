@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { CreatePingSchema } from '@toursafe/lib';
+import { CreatePingSchema, type Ping } from '@toursafe/lib';
 import { supabaseAdmin } from '../../../../lib/supabase';
+import {
+  sendNotificationToTourist,
+  sendNotificationToOperators,
+  NotificationTemplates
+} from '../../../../lib/notifications';
+
+// Type for zone intersection result from RPC
+type ZoneIntersection = {
+  zone_id: string;
+  zone_name: string;
+  zone_type: 'SAFE' | 'RESTRICTED' | 'ALERT';
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +50,7 @@ export async function POST(request: NextRequest) {
     
     // Check for restricted zones and create incidents
     let incidentCreated = null;
-    const restrictedZones = zonesHit.filter(z => z.zone_type === 'RESTRICTED');
+    const restrictedZones = zonesHit.filter((z: ZoneIntersection) => z.zone_type === 'RESTRICTED');
     
     if (restrictedZones.length > 0) {
       const restrictedZone = restrictedZones[0];
@@ -66,7 +78,24 @@ export async function POST(request: NextRequest) {
         console.error('Incident creation failed:', incidentError);
       } else {
         incidentCreated = incident;
-        
+
+        // Send notification to tourist about restricted zone
+        await sendNotificationToTourist(
+          tourist_id,
+          NotificationTemplates.RESTRICTED_ZONE_WARNING
+        );
+
+        // Send notification to operators about new incident
+        await sendNotificationToOperators({
+          ...NotificationTemplates.NEW_INCIDENT,
+          body: `Tourist entered restricted zone. Incident #${incident.id} created.`,
+          data: {
+            incidentId: incident.id,
+            touristId: tourist_id,
+            type: 'RESTRICTED'
+          }
+        });
+
         // Publish to realtime channel for dashboard
         await supabaseAdmin
           .channel('incidents')
@@ -94,7 +123,7 @@ export async function POST(request: NextRequest) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            pings: recentPings.map(p => ({
+            pings: recentPings.map((p: Ping) => ({
               ts: p.ts,
               lat: p.lat,
               lng: p.lng,
@@ -109,7 +138,7 @@ export async function POST(request: NextRequest) {
           
           // Create incidents for AI-detected anomalies
           if (aiResult.verdict !== 'OK' && !incidentCreated) {
-            const { error: aiIncidentError } = await supabaseAdmin
+            const { data: aiIncident, error: aiIncidentError } = await supabaseAdmin
               .from('incidents')
               .insert({
                 tourist_id,
@@ -123,10 +152,54 @@ export async function POST(request: NextRequest) {
                   ai_reason: aiResult.reason,
                   auto_generated: true
                 }
-              });
+              })
+              .select()
+              .single();
 
             if (aiIncidentError) {
               console.error('AI incident creation failed:', aiIncidentError);
+            } else {
+              incidentCreated = aiIncident;
+
+              // Send notification to tourist about AI-detected anomaly
+              const notificationTemplate = aiResult.verdict === 'IMMOBILE'
+                ? NotificationTemplates.IMMOBILE_WARNING
+                : NotificationTemplates.NEW_INCIDENT;
+
+              await sendNotificationToTourist(
+                tourist_id,
+                {
+                  ...notificationTemplate,
+                  body: `AI detected ${aiResult.verdict.toLowerCase()}: ${aiResult.reason}`,
+                  data: {
+                    incidentId: aiIncident.id,
+                    touristId: tourist_id,
+                    type: aiResult.verdict,
+                    aiScore: aiResult.score
+                  }
+                }
+              );
+
+              // Send notification to operators
+              await sendNotificationToOperators({
+                ...NotificationTemplates.NEW_INCIDENT,
+                body: `AI detected ${aiResult.verdict} for tourist. Incident #${aiIncident.id} created.`,
+                data: {
+                  incidentId: aiIncident.id,
+                  touristId: tourist_id,
+                  type: aiResult.verdict,
+                  aiScore: aiResult.score
+                }
+              });
+
+              // Publish to realtime channel for dashboard
+              await supabaseAdmin
+                .channel('incidents')
+                .send({
+                  type: 'broadcast',
+                  event: 'new_incident',
+                  payload: aiIncident
+                });
             }
           }
         }
@@ -141,7 +214,7 @@ export async function POST(request: NextRequest) {
         id: ping.id,
         ts: ping.ts
       },
-      zonesHit: zonesHit.map(z => ({
+      zonesHit: zonesHit.map((z: ZoneIntersection) => ({
         id: z.zone_id,
         name: z.zone_name,
         type: z.zone_type

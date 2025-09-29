@@ -1,6 +1,196 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Button } from '@toursafe/ui';
+import { Shield, AlertTriangle, Settings, Home, Wifi, WifiOff, MapPin, Users, Activity, CheckCircle, LogOut } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { getCurrentUser, signOut } from '../../lib/auth';
+import { supabase } from '../../lib/supabase';
+import { onMessageListener } from '../../lib/firebase';
+import { LanguageSwitcher } from '../../components/language-switcher';
+
+interface Stats {
+  activeTourists: number;
+  openIncidents: number;
+  resolvedToday: number;
+  aiActive: boolean;
+}
+
+interface Incident {
+  id: string;
+  type: string;
+  severity: string;
+  tourist: {
+    display_name: string;
+  };
+  lat: number;
+  lng: number;
+  status: string;
+  ts: string;
+  description: string;
+}
 
 export default function AdminDashboard() {
+  const [user, setUser] = useState<any>(null);
+  const [stats, setStats] = useState<Stats>({
+    activeTourists: 0,
+    openIncidents: 0,
+    resolvedToday: 0,
+    aiActive: true
+  });
+  const [recentIncidents, setRecentIncidents] = useState<Incident[]>([]);
+  const [isOnline, setIsOnline] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  // Check authentication and load data on mount
+  useEffect(() => {
+    checkAuth();
+    loadDashboardData();
+
+    // Set up online/offline detection
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    setIsOnline(navigator.onLine);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Set up real-time incident updates
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('incidents')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'incidents'
+        },
+        (payload) => {
+          console.log('Real-time incident update:', payload);
+          loadDashboardData(); // Refresh dashboard data
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  // Set up FCM message listener
+  useEffect(() => {
+    const unsubscribe = onMessageListener((payload) => {
+      console.log('FCM message received:', payload);
+      const { title, body } = payload.notification || {};
+      toast(body || title || 'Notification', {
+        duration: 5000,
+      });
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        router.push('/admin/login');
+        return;
+      }
+      setUser(currentUser);
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      router.push('/admin/login');
+    }
+  };
+
+  const loadDashboardData = async () => {
+    try {
+      // Load stats
+      const [touristsRes, incidentsRes, resolvedRes] = await Promise.all([
+        supabase.from('tourists').select('id', { count: 'exact' }).eq('active', true),
+        supabase.from('incidents').select('id', { count: 'exact' }).eq('status', 'OPEN'),
+        supabase.from('incidents').select('id', { count: 'exact' })
+          .eq('status', 'CLOSED')
+          .gte('ts', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      ]);
+
+      setStats({
+        activeTourists: touristsRes.count || 0,
+        openIncidents: incidentsRes.count || 0,
+        resolvedToday: resolvedRes.count || 0,
+        aiActive: true
+      });
+
+      // Load recent incidents
+      const { data: incidents } = await supabase
+        .from('incidents')
+        .select(`
+          id,
+          type,
+          severity,
+          lat,
+          lng,
+          status,
+          ts,
+          tourists(display_name),
+          meta
+        `)
+        .order('ts', { ascending: false })
+        .limit(5);
+
+      if (incidents) {
+        setRecentIncidents(incidents.map(incident => ({
+          ...incident,
+          tourist: incident.tourists as any,
+          description: incident.meta?.description || `${incident.type} incident reported`
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      setUser(null);
+      router.push('/admin/login');
+    } catch (error) {
+      console.error('Sign out failed:', error);
+      toast.error('Failed to sign out');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // Will redirect in checkAuth
+  }
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -8,13 +198,18 @@ export default function AdminDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
-              <svg className="h-8 w-8 text-blue-600 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
+              <Shield className="h-8 w-8 text-blue-600 mr-3" />
               <h1 className="text-2xl font-bold text-gray-900">TourSafe Admin</h1>
             </div>
-            <div className="text-sm text-gray-500">
-              Operator Dashboard
+            <div className="flex items-center space-x-4">
+              <LanguageSwitcher />
+              <div className="text-sm text-gray-500">
+                {user?.email} ({user?.role})
+              </div>
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
             </div>
           </div>
         </div>
@@ -47,7 +242,7 @@ export default function AdminDashboard() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Active Tourists</dt>
-                      <dd className="text-lg font-medium text-gray-900">2</dd>
+                      <dd className="text-lg font-medium text-gray-900">{stats.activeTourists}</dd>
                     </dl>
                   </div>
                 </div>
@@ -65,7 +260,7 @@ export default function AdminDashboard() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Open Incidents</dt>
-                      <dd className="text-lg font-medium text-gray-900">1</dd>
+                      <dd className="text-lg font-medium text-gray-900">{stats.openIncidents}</dd>
                     </dl>
                   </div>
                 </div>
@@ -83,7 +278,7 @@ export default function AdminDashboard() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Resolved Today</dt>
-                      <dd className="text-lg font-medium text-gray-900">0</dd>
+                      <dd className="text-lg font-medium text-gray-900">{stats.resolvedToday}</dd>
                     </dl>
                   </div>
                 </div>
@@ -101,7 +296,7 @@ export default function AdminDashboard() {
                   <div className="ml-5 w-0 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">AI Detections</dt>
-                      <dd className="text-lg font-medium text-gray-900">Active</dd>
+                      <dd className="text-lg font-medium text-gray-900">{stats.aiActive ? 'Active' : 'Offline'}</dd>
                     </dl>
                   </div>
                 </div>
@@ -170,6 +365,74 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* Recent Incidents */}
+          <div className="bg-white shadow rounded-lg mb-8">
+            <div className="px-4 py-5 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Recent Incidents</h3>
+                <Link href="/admin/incidents">
+                  <Button variant="outline" size="sm">
+                    View All
+                  </Button>
+                </Link>
+              </div>
+              <div className="space-y-4">
+                {recentIncidents.length === 0 ? (
+                  <div className="text-center py-8">
+                    <CheckCircle className="mx-auto h-12 w-12 text-green-400 mb-4" />
+                    <p className="text-gray-500">No recent incidents. All tourists are safe!</p>
+                  </div>
+                ) : (
+                  recentIncidents.map((incident) => (
+                    <div key={incident.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                      <div className="flex items-center">
+                        <div className={`flex-shrink-0 h-3 w-3 rounded-full ${
+                          incident.status === 'OPEN' ? 'bg-red-400' :
+                          incident.status === 'ACK' ? 'bg-yellow-400' : 'bg-green-400'
+                        }`}></div>
+                        <div className="ml-4">
+                          <div className="flex items-center">
+                            <p className="text-sm font-medium text-gray-900">
+                              {incident.type} - {incident.tourist?.display_name || 'Unknown'}
+                            </p>
+                            <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              incident.severity === 'HIGH' ? 'bg-red-100 text-red-800' :
+                              incident.severity === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-green-100 text-green-800'
+                            }`}>
+                              {incident.severity}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-sm text-gray-500">
+                            {incident.description}
+                          </div>
+                          <div className="mt-1 text-xs text-gray-400">
+                            {new Date(incident.ts).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {incident.status === 'OPEN' && (
+                          <>
+                            <Button variant="outline" size="sm">
+                              Acknowledge
+                            </Button>
+                            <Button size="sm">
+                              Assign
+                            </Button>
+                          </>
+                        )}
+                        <Button variant="ghost" size="sm">
+                          Details
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Service Status */}
           <div className="bg-white shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
@@ -202,6 +465,21 @@ export default function AdminDashboard() {
                     <span className="text-sm font-medium text-gray-900">Push Notifications</span>
                   </div>
                   <span className="text-sm text-green-600">Ready</span>
+                </div>
+                <div className={`flex items-center justify-between p-4 rounded-lg ${
+                  isOnline ? 'bg-green-50' : 'bg-red-50'
+                }`}>
+                  <div className="flex items-center">
+                    <div className={`h-3 w-3 rounded-full mr-3 ${
+                      isOnline ? 'bg-green-400' : 'bg-red-400'
+                    }`}></div>
+                    <span className="text-sm font-medium text-gray-900">Connection Status</span>
+                  </div>
+                  <span className={`text-sm ${
+                    isOnline ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {isOnline ? 'Online' : 'Offline'}
+                  </span>
                 </div>
               </div>
             </div>

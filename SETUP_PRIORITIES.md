@@ -18,10 +18,14 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 AMOY_RPC_URL=https://rpc-amoy.polygon.technology
 CHAIN_PRIVATE_KEY=your-test-wallet-private-key
 
-# 🔔 Firebase (Optional)
+# 🔔 Firebase (Optional - For push notifications)
+# Note: FIREBASE_SERVER_KEY is deprecated. Use service account JSON file instead.
+# Place your Firebase service account JSON file as 'travel-safety.json' in the web app root.
 NEXT_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=toursafe-demo
-FIREBASE_SERVER_KEY=your-firebase-server-key
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-firebase-app-id
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=your-vapid-key
 ```
 
 ### **Step 2: Quick 15-Minute Setup**

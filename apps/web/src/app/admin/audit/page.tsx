@@ -1,6 +1,107 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@toursafe/ui';
+import { Shield, CheckCircle, XCircle, Copy, ExternalLink } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { getCurrentUser } from '../../../lib/auth';
+
+interface VerificationResult {
+  isValid: boolean;
+  onChainProof?: {
+    txHash: string;
+    matched: boolean;
+  };
+  credential?: any;
+  error?: string;
+}
 
 export default function AuditPage() {
+  const [user, setUser] = useState<any>(null);
+  const [vcJwt, setVcJwt] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const router = useRouter();
+
+  // Check authentication on mount
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        router.push('/admin/login');
+        return;
+      }
+      setUser(currentUser);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      router.push('/admin/login');
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!vcJwt.trim()) {
+      toast.error('Please enter a VC JWT token');
+      return;
+    }
+
+    setIsVerifying(true);
+    setVerificationResult(null);
+
+    try {
+      const response = await fetch('/api/v1/vc/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vcJwt: vcJwt.trim() })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setVerificationResult(result);
+        toast.success(result.isValid ? 'VC verified successfully!' : 'VC verification failed');
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Verification failed');
+      }
+    } catch (error) {
+      console.error('VC verification failed:', error);
+      setVerificationResult({
+        isValid: false,
+        error: error instanceof Error ? error.message : 'Verification failed'
+      });
+      toast.error(error instanceof Error ? error.message : 'Verification failed');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Copied to clipboard!');
+    } catch (error) {
+      toast.error('Failed to copy');
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -42,88 +143,113 @@ export default function AuditPage() {
                     VC JWT Token
                   </label>
                   <textarea
+                    value={vcJwt}
+                    onChange={(e) => setVcJwt(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 resize-none h-32 font-mono text-sm"
-                    placeholder="Paste the JWT token here (starts with eyJ...)&#10;&#10;Example:&#10;eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJkaWQ6d2ViOnRvdXJzYWZlLmFwcCIsInN1YiI6ImRpZDp0b3VyaXN0OmFsaWNlIiwiaWF0IjoxNjQwOTk1MjAwLCJleHAiOjE5NTYzNTUyMDAsInZjIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIl0sInR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiLCJUb3VyaXN0SWRlbnRpdHlDcmVkZW50aWFsIl0sImNyZWRlbnRpYWxTdWJqZWN0Ijp7ImlkIjoiZGlkOnRvdXJpc3Q6YWxpY2UiLCJkaXNwbGF5TmFtZSI6IkFsaWNlIFRvdXJpc3QifX19.placeholder_signature_alice"
+                    placeholder="Paste the JWT token here (starts with eyJ...)"
                   />
                 </div>
-                
-                <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Verify on Blockchain
-                </button>
+
+                <Button onClick={handleVerify} disabled={isVerifying} className="w-full">
+                  {isVerifying ? 'Verifying...' : 'Verify on Blockchain'}
+                </Button>
               </div>
             </div>
           </div>
 
-          {/* Verification Result (Example) */}
-          <div className="bg-white shadow rounded-lg mb-8">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                Verification Result
-              </h3>
-              
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-green-800">
-                      Verification Successful
-                    </h3>
-                    <div className="mt-2 text-sm text-green-700">
-                      <p>The credential has been successfully verified against the blockchain anchor.</p>
+          {/* Verification Result */}
+          {verificationResult && (
+            <div className="bg-white shadow rounded-lg mb-8">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                  Verification Result
+                </h3>
+
+                <div className={`border rounded-lg p-4 mb-4 ${
+                  verificationResult.isValid
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-red-50 border-red-200'
+                }`}>
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      {verificationResult.isValid ? (
+                        <CheckCircle className="h-5 w-5 text-green-400" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-400" />
+                      )}
+                    </div>
+                    <div className="ml-3">
+                      <h3 className={`text-sm font-medium ${
+                        verificationResult.isValid ? 'text-green-800' : 'text-red-800'
+                      }`}>
+                        {verificationResult.isValid ? 'Verification Successful' : 'Verification Failed'}
+                      </h3>
+                      <div className={`mt-2 text-sm ${
+                        verificationResult.isValid ? 'text-green-700' : 'text-red-700'
+                      }`}>
+                        <p>
+                          {verificationResult.isValid
+                            ? 'The credential has been successfully verified against the blockchain anchor.'
+                            : verificationResult.error || 'The credential could not be verified.'
+                          }
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">VC Hash</dt>
-                  <dd className="mt-1 text-sm text-gray-900 font-mono break-all">
-                    e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Transaction Hash</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    <a href="#" className="text-blue-600 hover:text-blue-800 font-mono break-all">
-                      0x742d35Cc6633C0532925a3b8D8A4e0A634f3c0DE
-                    </a>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Block Number</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    #12,345,678
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Timestamp</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    2024-01-15 14:30:25 UTC
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Issuer</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    did:web:toursafe.app
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Subject</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    Alice Tourist
-                  </dd>
-                </div>
+                {verificationResult.isValid && verificationResult.credential && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">VC Hash</dt>
+                      <dd className="mt-1 text-sm text-gray-900 font-mono break-all">
+                        {verificationResult.credential.vcSha256}
+                      </dd>
+                    </div>
+                    {verificationResult.onChainProof?.txHash && (
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Transaction Hash</dt>
+                        <dd className="mt-1 text-sm text-gray-900">
+                          <div className="flex items-center space-x-2">
+                            <code className="font-mono break-all">
+                              {verificationResult.onChainProof.txHash}
+                            </code>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => copyToClipboard(verificationResult.onChainProof!.txHash)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            <a
+                              href={`https://amoy.polygonscan.com/tx/${verificationResult.onChainProof.txHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </div>
+                        </dd>
+                      </div>
+                    )}
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Issuer</dt>
+                      <dd className="mt-1 text-sm text-gray-900">
+                        {verificationResult.credential.issuer || 'Unknown'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Subject</dt>
+                      <dd className="mt-1 text-sm text-gray-900">
+                        {verificationResult.credential.credentialSubject?.displayName || 'Unknown'}
+                      </dd>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Recent Verifications */}
           <div className="bg-white shadow rounded-lg">
