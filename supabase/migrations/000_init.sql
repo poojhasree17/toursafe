@@ -80,17 +80,135 @@ create table device_tokens (
   check ((tourist_id is not null and user_id is null) or (tourist_id is null and user_id is not null))
 );
 
+-- Family tracking relationships for location sharing
+create table family_tracking (
+  id uuid primary key default gen_random_uuid(),
+  tourist_id uuid not null references tourists(id) on delete cascade,
+  family_member_email text not null,
+  family_member_name text not null,
+  relationship text not null check (relationship in ('parent', 'spouse', 'sibling', 'child', 'guardian', 'other')),
+  consent_given boolean default true,
+  consent_timestamp timestamptz default now(),
+  expires_at timestamptz, -- Optional expiration for temporary sharing
+  is_active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Family member access tokens for secure location viewing
+create table family_access_tokens (
+  id uuid primary key default gen_random_uuid(),
+  family_tracking_id uuid not null references family_tracking(id) on delete cascade,
+  token_hash text not null unique, -- Hashed token for security
+  expires_at timestamptz not null,
+  is_active boolean default true,
+  created_at timestamptz default now(),
+  last_used_at timestamptz
+);
+
+-- E-FIR (Electronic First Information Report) records
+create table efirs (
+  id uuid primary key default gen_random_uuid(),
+  tourist_id uuid not null references tourists(id) on delete cascade,
+  incident_id uuid references incidents(id) on delete set null,
+  fir_number text unique not null, -- Auto-generated FIR number
+  complainant_name text not null,
+  complainant_address text,
+  complainant_phone text,
+  incident_type text not null check (incident_type in ('MISSING_PERSON', 'THEFT', 'ASSAULT', 'ACCIDENT', 'OTHER')),
+  incident_description text not null,
+  incident_location text,
+  incident_datetime timestamptz not null,
+  witnesses jsonb default '[]'::jsonb, -- Array of witness information
+  evidence jsonb default '[]'::jsonb, -- Array of evidence references
+  police_station text,
+  investigating_officer text,
+  status text not null check (status in ('DRAFT', 'SUBMITTED', 'UNDER_INVESTIGATION', 'CLOSED')) default 'DRAFT',
+  blockchain_hash text, -- Hash of FIR for blockchain verification
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  submitted_at timestamptz
+);
+
+-- IoT Devices (Smart bands, tags, wearables)
+create table iot_devices (
+  id uuid primary key default gen_random_uuid(),
+  tourist_id uuid not null references tourists(id) on delete cascade,
+  device_id text unique not null, -- Unique device identifier (e.g., MAC address, serial number)
+  device_type text not null check (device_type in ('SMART_BAND', 'GPS_TAG', 'HEALTH_MONITOR', 'EMERGENCY_BUTTON')),
+  device_name text not null,
+  manufacturer text,
+  model text,
+  firmware_version text,
+  battery_level integer check (battery_level >= 0 and battery_level <= 100),
+  is_active boolean default true,
+  last_seen timestamptz,
+  registered_at timestamptz default now(),
+  settings jsonb default '{}'::jsonb, -- Device-specific configuration
+  status text not null check (status in ('REGISTERED', 'ACTIVE', 'INACTIVE', 'MAINTENANCE', 'DECOMMISSIONED')) default 'REGISTERED'
+);
+
+-- IoT Device Data Points (Health, location, emergency signals)
+create table iot_data_points (
+  id bigserial primary key,
+  device_id uuid not null references iot_devices(id) on delete cascade,
+  data_type text not null check (data_type in ('LOCATION', 'HEART_RATE', 'TEMPERATURE', 'FALL_DETECTED', 'EMERGENCY_BUTTON', 'BATTERY_LEVEL', 'STEP_COUNT')),
+  value numeric, -- The actual sensor reading
+  unit text, -- Unit of measurement (e.g., 'bpm', 'celsius', 'meters')
+  location_lat double precision check (location_lat >= -90 and location_lat <= 90),
+  location_lng double precision check (location_lng >= -180 and location_lng <= 180),
+  metadata jsonb default '{}'::jsonb, -- Additional device-specific data
+  recorded_at timestamptz not null default now(),
+  processed_at timestamptz, -- When this data point was processed by the system
+  alert_generated boolean default false -- Whether this data point triggered an alert
+);
+
+-- IoT Device Alerts (Generated from abnormal readings)
+create table iot_alerts (
+  id uuid primary key default gen_random_uuid(),
+  device_id uuid not null references iot_devices(id) on delete cascade,
+  data_point_id bigint references iot_data_points(id),
+  alert_type text not null check (alert_type in ('HIGH_HEART_RATE', 'LOW_BATTERY', 'FALL_DETECTED', 'EMERGENCY_SIGNAL', 'DEVICE_OFFLINE', 'LOCATION_DEVIATION')),
+  severity text not null check (severity in ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')) default 'MEDIUM',
+  message text not null,
+  acknowledged boolean default false,
+  acknowledged_by uuid references app_users(id),
+  acknowledged_at timestamptz,
+  resolved boolean default false,
+  resolved_at timestamptz,
+  created_at timestamptz default now()
+);
+
 -- Indexes for performance
 create index on pings (tourist_id, ts desc);
-create index on pings (ts desc) where ts > now() - interval '1 day'; -- Recent pings
+-- create index on pings (ts desc) where ts > now() - interval '1 day'; -- Recent pings (disabled - uses volatile function)
 create index on zones using gist (geom);
 create index on incidents (status) where status in ('OPEN', 'ACK');
 create index on incidents (ts desc);
 create index on device_tokens (tourist_id);
 create index on device_tokens (user_id);
+create index on family_tracking (tourist_id);
+create index on family_tracking (family_member_email);
+create index on family_tracking (is_active) where is_active = true;
+create index on family_access_tokens (family_tracking_id);
+create index on family_access_tokens (token_hash) where is_active = true;
+create index on efirs (tourist_id);
+create index on efirs (fir_number);
+create index on efirs (status) where status in ('DRAFT', 'SUBMITTED');
+create index on efirs (incident_datetime desc);
+create index on iot_devices (tourist_id);
+create index on iot_devices (device_id);
+create index on iot_devices (status) where status = 'ACTIVE';
+create index on iot_data_points (device_id, recorded_at desc);
+create index on iot_data_points (data_type, recorded_at desc);
+create index on iot_data_points (recorded_at desc) where recorded_at > now() - interval '1 hour';
+create index on iot_alerts (device_id, created_at desc);
+create index on iot_alerts (alert_type);
+create index on iot_alerts (acknowledged) where acknowledged = false;
 
 -- Spatial index on pings for geospatial queries
-create index on pings using gist (ST_Point(lng, lat));
+-- Note: Create this index manually after running migrations if needed:
+-- create index on pings using gist (ST_Point(lng, lat));
 
 -- RLS (Row Level Security) policies
 alter table app_users enable row level security;
@@ -99,6 +217,12 @@ alter table zones enable row level security;
 alter table pings enable row level security;
 alter table incidents enable row level security;
 alter table device_tokens enable row level security;
+alter table family_tracking enable row level security;
+alter table family_access_tokens enable row level security;
+alter table efirs enable row level security;
+alter table iot_devices enable row level security;
+alter table iot_data_points enable row level security;
+alter table iot_alerts enable row level security;
 
 -- Policy: App users can read all data (for dashboard)
 create policy "App users can read all" on app_users
@@ -133,6 +257,54 @@ create policy "Public can read zones" on zones
 -- Policy: Public can create incidents (SOS)
 create policy "Public can create incidents" on incidents
   for insert with check (true);
+
+-- Family tracking policies
+create policy "Tourists can manage their family tracking" on family_tracking
+  for all using (true); -- App-level validation will handle tourist_id matching
+
+create policy "Family members can view their tracking relationships" on family_tracking
+  for select using (family_member_email = current_setting('app.current_user_email', true));
+
+create policy "Tourists can manage their access tokens" on family_access_tokens
+  for all using (true); -- Managed through family_tracking relationship
+
+create policy "Family members can use their access tokens" on family_access_tokens
+  for select using (is_active = true and expires_at > now());
+
+-- E-FIR policies
+create policy "Tourists can manage their E-FIRs" on efirs
+  for all using (true); -- App-level validation will handle tourist_id matching
+
+create policy "App users can read all E-FIRs" on efirs
+  for select using (true);
+
+create policy "App users can update E-FIR status" on efirs
+  for update using (true);
+
+-- IoT Device policies
+create policy "Tourists can manage their IoT devices" on iot_devices
+  for all using (true); -- App-level validation will handle tourist_id matching
+
+create policy "App users can read all IoT devices" on iot_devices
+  for select using (true);
+
+create policy "IoT devices can insert their data" on iot_data_points
+  for insert with check (true); -- Device authentication handled at API level
+
+create policy "App users can read IoT data" on iot_data_points
+  for select using (true);
+
+create policy "Tourists can view their IoT alerts" on iot_alerts
+  for select using (
+    device_id in (
+      select id from iot_devices where tourist_id in (
+        select id from tourists where id = current_setting('app.current_tourist_id', true)::uuid
+      )
+    )
+  );
+
+create policy "App users can manage IoT alerts" on iot_alerts
+  for all using (true);
 
 -- Functions for geospatial queries
 

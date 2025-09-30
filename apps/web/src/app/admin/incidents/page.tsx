@@ -1,6 +1,12 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
+import { EFIRGenerator } from '../../../components/efir-generator';
 
 export default function IncidentsPage() {
+  const [activeTab, setActiveTab] = useState<'incidents' | 'efirs'>('incidents');
+
   // Mock incident data
   const incidents = [
     {
@@ -39,8 +45,36 @@ export default function IncidentsPage() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          
-          {/* Filters */}
+
+          {/* Tab Navigation */}
+          <div className="mb-6">
+            <nav className="flex space-x-8">
+              <button
+                onClick={() => setActiveTab('incidents')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'incidents'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Active Incidents
+              </button>
+              <button
+                onClick={() => setActiveTab('efirs')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'efirs'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                E-FIR Management
+              </button>
+            </nav>
+          </div>
+
+          {activeTab === 'incidents' && (
+            <>
+              {/* Filters */}
           <div className="bg-white shadow rounded-lg mb-6">
             <div className="px-4 py-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-4">
@@ -136,6 +170,26 @@ export default function IncidentsPage() {
               </svg>
               <h3 className="mt-2 text-sm font-medium text-gray-900">No incidents</h3>
               <p className="mt-1 text-sm text-gray-500">All tourists are safe and no incidents have been reported.</p>
+            </div>
+          )}
+
+          {activeTab === 'efirs' && (
+            <div className="space-y-6">
+              {/* E-FIR Generation for Admins - All tourists */}
+              <EFIRGenerator
+                touristId="admin-view" // Special case for admin viewing all E-FIRs
+                touristName="Admin Dashboard"
+              />
+
+              {/* E-FIR Management Table would go here in production */}
+              <div className="bg-white shadow rounded-lg">
+                <div className="px-4 py-5 sm:p-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">All E-FIRs</h3>
+                  <p className="text-sm text-gray-600">
+                    Full E-FIR management interface would be implemented here with search, filtering, and bulk operations.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -27,15 +27,57 @@ async function seedDatabase() {
   console.log('🌱 Starting database seeding...');
 
   try {
+    // Create demo users in Supabase Auth
+    console.log('👤 Creating demo users in Supabase Auth...');
+
+    const demoUsers = [
+      { email: 'admin@toursafe.demo', password: 'admin123', role: 'ADMIN' },
+      { email: 'operator@toursafe.demo', password: 'operator123', role: 'OPERATOR' }
+    ];
+
+    for (const user of demoUsers) {
+      try {
+        // Create user in Supabase Auth
+        const { data, error } = await supabase.auth.admin.createUser({
+          email: user.email,
+          password: user.password,
+          email_confirm: true,
+          user_metadata: {
+            role: user.role
+          }
+        });
+
+        if (error) {
+          console.error(`❌ Failed to create user ${user.email}:`, error);
+        } else {
+          console.log(`✅ Created user: ${user.email} (${user.role})`);
+
+          // Also add to app_users table if not exists
+          const { error: appUserError } = await supabase
+            .from('app_users')
+            .upsert({
+              id: data.user.id,
+              email: user.email,
+              role: user.role
+            });
+
+          if (appUserError) {
+            console.error(`❌ Failed to add user to app_users table:`, appUserError);
+          }
+        }
+      } catch (userError) {
+        console.error(`❌ Error creating user ${user.email}:`, userError);
+      }
+    }
+
     // Run the seed SQL file
     console.log('📊 Running seed SQL...');
-    
+
     // In a real deployment, you would read and execute the seed.sql file
     // For now, let's just verify the database connection
-    const { data, error } = await supabase
+    const { count, error } = await supabase
       .from('zones')
-      .select('count(*)')
-      .single();
+      .select('*', { count: 'exact', head: true });
 
     if (error) {
       console.error('❌ Database connection failed:', error);
@@ -43,7 +85,7 @@ async function seedDatabase() {
     }
 
     console.log('✅ Database connection verified');
-    console.log('📍 Found zones in database');
+    console.log(`📍 Found ${count} zones in database`);
 
     // Check if demo data exists
     const { data: tourists } = await supabase

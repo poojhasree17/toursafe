@@ -6,9 +6,13 @@ import { Shield, ArrowLeft, Trash2, Download, Globe, Bell, MapPin, Eye, EyeOff }
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { getStoredVC, clearStoredVC } from '../../../lib/utils';
+import { FamilyTrackingSettings } from '../../../components/family-tracking';
+import { IoTDeviceManager } from '../../../components/iot-device-manager';
 
 export default function TouristSettingsPage() {
   const [vcJwt, setVcJwt] = useState<string | null>(null);
+  const [touristId, setTouristId] = useState<string | null>(null);
+  const [touristName, setTouristName] = useState<string>('Tourist');
   const [locationTracking, setLocationTracking] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [language, setLanguage] = useState('en');
@@ -20,13 +24,27 @@ export default function TouristSettingsPage() {
     const storedVC = getStoredVC();
     setVcJwt(storedVC);
 
+    // Parse VC to get tourist info
+    if (storedVC) {
+      try {
+        const parts = storedVC.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          setTouristId(payload.touristId || payload.jti);
+          setTouristName(payload.displayName || payload.name || 'Tourist');
+          setEmergencyContact(payload.emergencyContact || '');
+        }
+      } catch (error) {
+        console.error('Failed to parse VC:', error);
+      }
+    }
+
     // Load settings from localStorage
     const settings = JSON.parse(localStorage.getItem('toursafe-settings') || '{}');
     setLocationTracking(settings.locationTracking ?? true);
     setNotifications(settings.notifications ?? true);
     setLanguage(settings.language || 'en');
     setPrivateMode(settings.privateMode ?? false);
-    setEmergencyContact(settings.emergencyContact || '');
   }, []);
 
   const saveSettings = () => {
@@ -273,6 +291,22 @@ export default function TouristSettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Family Tracking */}
+        {touristId && (
+          <FamilyTrackingSettings
+            touristId={touristId}
+            touristName={touristName}
+          />
+        )}
+
+        {/* IoT Device Management */}
+        {touristId && (
+          <IoTDeviceManager
+            touristId={touristId}
+            touristName={touristName}
+          />
+        )}
 
         {/* App Information */}
         <Card>

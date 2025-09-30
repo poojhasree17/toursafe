@@ -92,3 +92,4 @@ async function syncPings() {
     console.error('Background sync failed:', error);
   }
 }
+

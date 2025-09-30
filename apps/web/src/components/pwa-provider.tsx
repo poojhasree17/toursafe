@@ -14,3 +14,4 @@ export function PWAProvider({ children }: PWAProviderProps) {
 
   return <>{children}</>;
 }
+

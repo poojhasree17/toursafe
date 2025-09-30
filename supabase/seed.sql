@@ -1,7 +1,7 @@
 -- Insert demo app users
-insert into app_users (id, email, role) values 
-  ('11111111-1111-1111-1111-111111111111', 'admin@toursafe.app', 'ADMIN'),
-  ('22222222-2222-2222-2222-222222222222', 'operator@toursafe.app', 'OPERATOR');
+insert into app_users (id, email, role) values
+  ('11111111-1111-1111-1111-111111111111', 'admin@toursafe.demo', 'ADMIN'),
+  ('22222222-2222-2222-2222-222222222222', 'operator@toursafe.demo', 'OPERATOR');
 
 -- Insert demo tourists with placeholder VCs
 insert into tourists (id, display_name, vc_jwt, vc_sha256, emergency_contact, lang) values

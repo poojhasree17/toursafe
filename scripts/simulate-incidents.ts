@@ -97,3 +97,4 @@ simulateIncidents().catch(error => {
   console.error('❌ Simulation failed:', error);
   process.exit(1);
 });
+
