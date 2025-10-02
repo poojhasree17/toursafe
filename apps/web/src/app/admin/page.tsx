@@ -405,17 +405,24 @@ export default function AdminDashboard() {
             <div className="bg-white overflow-hidden shadow rounded-lg">
               <div className="p-6">
                 <div className="flex items-center">
-                  <svg className="h-8 w-8 text-green-500 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg className="h-8 w-8 text-purple-500 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900">VC Verification</h3>
-                    <p className="text-sm text-gray-500">Verify blockchain credentials</p>
+                    <h3 className="text-lg font-medium text-gray-900">Tourist ID System</h3>
+                    <p className="text-sm text-gray-500">Issue and manage digital tourist IDs</p>
                   </div>
                 </div>
-                <div className="mt-4">
-                  <Link href="/admin/audit" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
-                    Audit Trail
+                <div className="mt-4 space-y-2">
+                  <Link href="/admin/tourist-id" className="block">
+                    <Button className="w-full text-left justify-start">
+                      Issue New ID
+                    </Button>
+                  </Link>
+                  <Link href="/admin/tourist-management" className="block">
+                    <Button variant="outline" className="w-full text-left justify-start">
+                      Manage Tourists
+                    </Button>
                   </Link>
                 </div>
               </div>

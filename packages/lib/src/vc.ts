@@ -1,11 +1,46 @@
 import { SignJWT, jwtVerify, importPKCS8, importSPKI } from 'jose';
 import { createHash, randomBytes } from 'crypto';
 
+export interface KYCInfo {
+  type: 'aadhaar' | 'passport' | 'other';
+  number: string;
+  country?: string;
+  expiryDate?: string;
+}
+
+export interface TripItinerary {
+  arrivalDate: string;
+  departureDate: string;
+  destinations: string[];
+  purpose?: string;
+}
+
+export interface EmergencyContact {
+  name: string;
+  relationship: string;
+  phone: string;
+  email?: string;
+}
+
+export interface EntryPoint {
+  type: 'airport' | 'hotel' | 'check-post' | 'other';
+  name: string;
+  location: string;
+  timestamp: string;
+}
+
 export interface VCClaim {
   id: string;
   displayName: string;
-  emergencyContact?: string;
+  email?: string;
+  phone?: string;
+  nationality: string;
+  kycInfo?: KYCInfo;
+  tripItinerary: TripItinerary;
+  emergencyContacts: EmergencyContact[];
+  entryPoint: EntryPoint;
   issuedAt: Date;
+  expiresAt: Date;
   issuer: string;
 }
 
@@ -15,10 +50,17 @@ export interface VerifiableCredential {
   id: string;
   issuer: string;
   issuanceDate: string;
+  expirationDate: string;
   credentialSubject: {
     id: string;
     displayName: string;
-    emergencyContact?: string;
+    email?: string;
+    phone?: string;
+    nationality: string;
+    kycInfo?: KYCInfo;
+    tripItinerary: TripItinerary;
+    emergencyContacts: EmergencyContact[];
+    entryPoint: EntryPoint;
   };
 }
 
@@ -42,7 +84,7 @@ export class VCService {
   /**
    * Issue a new Verifiable Credential as JWT
    */
-  async issueVC(claim: Omit<VCClaim, 'id' | 'issuedAt' | 'issuer'>): Promise<{
+  async issueVC(claim: Omit<VCClaim, 'id' | 'issuedAt' | 'expiresAt' | 'issuer'>): Promise<{
     vcJwt: string;
     vcSha256: string;
     credential: VerifiableCredential;
@@ -59,10 +101,17 @@ export class VCService {
       id: credentialId,
       issuer: this.issuerId,
       issuanceDate,
+      expirationDate: claim.tripItinerary.departureDate,
       credentialSubject: {
         id: `did:tourist:${randomBytes(8).toString('hex')}`,
         displayName: claim.displayName,
-        emergencyContact: claim.emergencyContact
+        email: claim.email,
+        phone: claim.phone,
+        nationality: claim.nationality,
+        kycInfo: claim.kycInfo,
+        tripItinerary: claim.tripItinerary,
+        emergencyContacts: claim.emergencyContacts,
+        entryPoint: claim.entryPoint
       }
     };
 
@@ -72,7 +121,7 @@ export class VCService {
         iss: this.issuerId,
         sub: credential.credentialSubject.id,
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60), // 1 year
+        exp: Math.floor(new Date(claim.tripItinerary.departureDate).getTime() / 1000), // Expires on departure date
         vc: credential
       };
 
@@ -99,7 +148,7 @@ export class VCService {
         iss: this.issuerId,
         sub: credential.credentialSubject.id,
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60), // 1 year
+        exp: Math.floor(new Date(claim.tripItinerary.departureDate).getTime() / 1000), // Expires on departure date
         vc: credential
       })
         .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
@@ -119,7 +168,7 @@ export class VCService {
         iss: this.issuerId,
         sub: credential.credentialSubject.id,
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60), // 1 year
+        exp: Math.floor(new Date(claim.tripItinerary.departureDate).getTime() / 1000), // Expires on departure date
         vc: credential
       };
 
@@ -227,6 +276,56 @@ export class VCService {
    */
   generateQRCodeData(vcJwt: string): string {
     return `toursafe://credential/${encodeURIComponent(vcJwt)}`;
+  }
+
+  /**
+   * Check if a VC is expired
+   */
+  isVCExpired(vcJwt: string): boolean {
+    try {
+      const payload = this.extractVCPayload(vcJwt);
+      if (!payload || !payload.exp) return true;
+
+      return Date.now() / 1000 > payload.exp;
+    } catch {
+      return true;
+    }
+  }
+
+  /**
+   * Get days until VC expires
+   */
+  getDaysUntilExpiry(vcJwt: string): number | null {
+    try {
+      const payload = this.extractVCPayload(vcJwt);
+      if (!payload || !payload.exp) return null;
+
+      const expiryTime = payload.exp * 1000; // Convert to milliseconds
+      const now = Date.now();
+      const daysUntilExpiry = Math.ceil((expiryTime - now) / (1000 * 60 * 60 * 24));
+
+      return Math.max(0, daysUntilExpiry);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Extract VC payload (for both demo and production JWTs)
+   */
+  private extractVCPayload(vcJwt: string): any {
+    if (vcJwt.includes('.')) {
+      const [headerB64, payloadB64] = vcJwt.split('.');
+      const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString());
+
+      if (header.alg === 'DEMO') {
+        return JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+      }
+    }
+
+    // For production JWTs, this would need proper verification
+    // For now, return null to indicate we need full verification
+    return null;
   }
 
   private generatePrivateKey(): string {
