@@ -1,0 +1,13 @@
+# Core dependencies for simulation scripts
+aiohttp>=3.9.0       # Async HTTP client
+python-dotenv>=1.0.0  # Environment variable loading
+supabase>=2.3.0       # Supabase Python client
+
+# Geospatial libraries (optional, for more accurate calculations)
+geopy>=2.4.0          # Professional geospatial calculations
+shapely>=2.0.0        # Geometric operations
+pyproj>=3.6.0         # Cartographic projections
+
+# Data processing and async utilities
+asyncio-mqtt>=0.16.0  # For potential MQTT integration
+pydantic>=2.0.0       # Data validation (if needed for complex configs)

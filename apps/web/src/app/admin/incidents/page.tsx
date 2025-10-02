@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { supabase } from '../../../lib/supabase';
 
 interface Incident {
   id: string;
@@ -30,6 +31,11 @@ export default function IncidentsPage() {
     loadIncidents();
   }, []);
 
+  const handleRefreshIncidents = () => {
+    loadIncidents();
+  };
+
+
   const loadIncidents = async () => {
     try {
       setLoading(true);
@@ -52,9 +58,19 @@ export default function IncidentsPage() {
           severity: 'HIGH',
           tourist: 'Alice Tourist',
           location: '18.9200, 72.8400',
-          status: 'OPEN',
+          status: 'ACK',
           timestamp: '5 minutes ago',
           description: 'Emergency SOS alert received'
+        },
+        {
+          id: '3',
+          type: 'IMMOBILE',
+          severity: 'HIGH',
+          tourist: 'Charlie Visitor',
+          location: '18.9250, 72.8350',
+          status: 'CLOSED',
+          timestamp: '10 minutes ago',
+          description: 'Tourist has been immobile for 8 minutes'
         }
       ];
 
@@ -72,13 +88,19 @@ export default function IncidentsPage() {
   const handleAcknowledge = async (incidentId: string) => {
     try {
       setActionLoading(incidentId);
-      // Update incident status to ACKNOWLEDGED
-      // In production, this would call your Supabase API
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
 
+      // Update incident status to ACK in database
+      const { error } = await supabase
+        .from('incidents')
+        .update({ status: 'ACK' })
+        .eq('id', incidentId);
+
+      if (error) throw error;
+
+      // Update local state
       setIncidents(prev => prev.map(incident =>
         incident.id === incidentId
-          ? { ...incident, status: 'ACKNOWLEDGED' }
+          ? { ...incident, status: 'ACK' }
           : incident
       ));
 
@@ -94,21 +116,29 @@ export default function IncidentsPage() {
   const handleAssign = async (incidentId: string) => {
     try {
       setActionLoading(incidentId);
+
       // In a real implementation, this would open an assignment modal
-      // For now, we'll just show a placeholder
-      toast('Assignment feature coming soon! This would open a modal to assign responders.', {
-        duration: 4000,
+      // For demo purposes, we'll update the status directly
+      toast('Assigning responder to incident...', {
+        duration: 2000,
       });
 
-      // Simulate assignment
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Update incident status to CLOSED in database (since there's no ASSIGNED status)
+      const { error } = await supabase
+        .from('incidents')
+        .update({ status: 'CLOSED' })
+        .eq('id', incidentId);
 
-      // Update status to ASSIGNED for demo
+      if (error) throw error;
+
+      // Update local state
       setIncidents(prev => prev.map(incident =>
         incident.id === incidentId
-          ? { ...incident, status: 'ASSIGNED' }
+          ? { ...incident, status: 'CLOSED' }
           : incident
       ));
+
+      toast.success('Incident closed successfully');
     } catch (error) {
       console.error('Failed to assign incident:', error);
       toast.error('Failed to assign incident');
@@ -123,8 +153,8 @@ export default function IncidentsPage() {
   };
 
   const filteredIncidents = incidents.filter(incident => {
-    const matchesStatus = statusFilter === 'all' || incident.status.toLowerCase() === statusFilter;
-    const matchesType = typeFilter === 'all' || incident.type.toLowerCase() === typeFilter;
+    const matchesStatus = statusFilter === 'all' || incident.status === statusFilter;
+    const matchesType = typeFilter === 'all' || incident.type === typeFilter;
     return matchesStatus && matchesType;
   });
 
@@ -143,7 +173,7 @@ export default function IncidentsPage() {
               <h1 className="text-2xl font-bold text-gray-900">Incident Management</h1>
             </div>
             <div className="text-sm text-gray-500">
-              {filteredIncidents.filter(i => i.status === 'OPEN').length} Open Incidents
+              {filteredIncidents.filter(i => i.status === 'OPEN' || i.status === 'ACKNOWLEDGED').length} Active Incidents
             </div>
           </div>
         </div>
@@ -193,10 +223,9 @@ export default function IncidentsPage() {
                         className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       >
                         <option value="all">All Incidents</option>
-                        <option value="open">Open</option>
-                        <option value="acknowledged">Acknowledged</option>
-                        <option value="assigned">Assigned</option>
-                        <option value="closed">Closed</option>
+                        <option value="OPEN">Open</option>
+                        <option value="ACK">Acknowledged</option>
+                        <option value="CLOSED">Closed</option>
                       </select>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -207,10 +236,10 @@ export default function IncidentsPage() {
                         className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       >
                         <option value="all">All Types</option>
-                        <option value="sos">SOS Alert</option>
-                        <option value="restricted">Restricted Area</option>
-                        <option value="immobile">Immobile</option>
-                        <option value="deviation">Route Deviation</option>
+                        <option value="SOS">SOS Alert</option>
+                        <option value="RESTRICTED">Restricted Area</option>
+                        <option value="IMMOBILE">Immobile</option>
+                        <option value="DEVIATION">Route Deviation</option>
                       </select>
                     </div>
                   </div>
@@ -222,9 +251,20 @@ export default function IncidentsPage() {
                 <div className="px-4 py-5 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-medium text-gray-900">Recent Incidents</h3>
-                    <Link href="/admin/incidents" className="text-blue-600 hover:text-blue-800">
-                      View All
-                    </Link>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={handleRefreshIncidents}
+                        className="inline-flex items-center px-3 py-1 border border-gray-300 text-sm font-medium rounded text-gray-700 bg-white hover:bg-gray-50"
+                      >
+                        <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                      </button>
+                      <Link href="/admin/incidents" className="text-blue-600 hover:text-blue-800">
+                        View All
+                      </Link>
+                    </div>
                   </div>
                   <div className="space-y-4">
                     {loading ? (
@@ -253,8 +293,7 @@ export default function IncidentsPage() {
                           <div className="flex items-center">
                             <div className={`flex-shrink-0 h-3 w-3 rounded-full ${
                               incident.status === 'OPEN' ? 'bg-red-400' :
-                              incident.status === 'ACKNOWLEDGED' ? 'bg-yellow-400' :
-                              incident.status === 'ASSIGNED' ? 'bg-blue-400' : 'bg-green-400'
+                              incident.status === 'ACK' ? 'bg-yellow-400' : 'bg-green-400'
                             }`}></div>
                             <div className="ml-4">
                               <div className="flex items-center">
@@ -278,7 +317,7 @@ export default function IncidentsPage() {
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            {(incident.status === 'OPEN' || incident.status === 'ACKNOWLEDGED') && (
+                            {incident.status === 'OPEN' && (
                               <>
                                 <button
                                   onClick={() => handleAcknowledge(incident.id)}
@@ -292,9 +331,23 @@ export default function IncidentsPage() {
                                   disabled={actionLoading === incident.id}
                                   className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                                 >
-                                  {actionLoading === incident.id ? '...' : 'Assign'}
+                                  {actionLoading === incident.id ? '...' : 'Close'}
                                 </button>
                               </>
+                            )}
+                            {incident.status === 'ACK' && (
+                              <button
+                                onClick={() => handleAssign(incident.id)}
+                                disabled={actionLoading === incident.id}
+                                className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                              >
+                                {actionLoading === incident.id ? '...' : 'Close'}
+                              </button>
+                            )}
+                            {incident.status === 'CLOSED' && (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800`}>
+                                {incident.status}
+                              </span>
                             )}
                             <button
                               onClick={() => handleDetails(incident.id)}

@@ -118,10 +118,12 @@ export default function AdminDashboard() {
 
   const loadDashboardData = async () => {
     try {
+      setLoading(true);
+
       // Load stats
       const [touristsRes, incidentsRes, resolvedRes] = await Promise.all([
         supabase.from('tourists').select('id', { count: 'exact' }).eq('active', true),
-        supabase.from('incidents').select('id', { count: 'exact' }).eq('status', 'OPEN'),
+        supabase.from('incidents').select('id', { count: 'exact' }).in('status', ['OPEN', 'ACK']),
         supabase.from('incidents').select('id', { count: 'exact' })
           .eq('status', 'CLOSED')
           .gte('ts', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
@@ -164,6 +166,61 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = () => {
+    loadDashboardData();
+  };
+
+  const [dashboardActionLoading, setDashboardActionLoading] = useState<string | null>(null);
+
+  const handleDashboardAcknowledge = async (incidentId: string) => {
+    try {
+      setDashboardActionLoading(incidentId);
+
+      // Update incident status to ACK in database
+      const { error } = await supabase
+        .from('incidents')
+        .update({ status: 'ACK' })
+        .eq('id', incidentId);
+
+      if (error) throw error;
+
+      toast.success('Incident acknowledged successfully');
+      loadDashboardData(); // Refresh dashboard data
+    } catch (error) {
+      console.error('Failed to acknowledge incident:', error);
+      toast.error('Failed to acknowledge incident');
+    } finally {
+      setDashboardActionLoading(null);
+    }
+  };
+
+  const handleDashboardClose = async (incidentId: string) => {
+    try {
+      setDashboardActionLoading(incidentId);
+
+      // Update incident status to CLOSED in database
+      const { error } = await supabase
+        .from('incidents')
+        .update({ status: 'CLOSED' })
+        .eq('id', incidentId);
+
+      if (error) throw error;
+
+      toast.success('Incident closed successfully');
+      loadDashboardData(); // Refresh dashboard data
+    } catch (error) {
+      console.error('Failed to close incident:', error);
+      toast.error('Failed to close incident');
+    } finally {
+      setDashboardActionLoading(null);
+    }
+  };
+
+  const handleDashboardDetails = (incidentId: string) => {
+    // Navigate to detailed incident view
+    router.push(`/admin/incidents/${incidentId}`);
   };
 
   const handleSignOut = async () => {
@@ -370,11 +427,19 @@ export default function AdminDashboard() {
             <div className="px-4 py-5 sm:p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Recent Incidents</h3>
-                <Link href="/admin/incidents">
-                  <Button variant="outline" size="sm">
-                    View All
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={handleRefresh}>
+                    <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
                   </Button>
-                </Link>
+                  <Link href="/admin/incidents">
+                    <Button variant="outline" size="sm">
+                      View All
+                    </Button>
+                  </Link>
+                </div>
               </div>
               <div className="space-y-4">
                 {recentIncidents.length === 0 ? (
@@ -388,7 +453,8 @@ export default function AdminDashboard() {
                       <div className="flex items-center">
                         <div className={`flex-shrink-0 h-3 w-3 rounded-full ${
                           incident.status === 'OPEN' ? 'bg-red-400' :
-                          incident.status === 'ACK' ? 'bg-yellow-400' : 'bg-green-400'
+                          incident.status === 'ACK' ? 'bg-yellow-400' :
+                          incident.status === 'CLOSED' ? 'bg-green-400' : 'bg-green-400'
                         }`}></div>
                         <div className="ml-4">
                           <div className="flex items-center">
@@ -414,15 +480,38 @@ export default function AdminDashboard() {
                       <div className="flex items-center space-x-2">
                         {incident.status === 'OPEN' && (
                           <>
-                            <Button variant="outline" size="sm">
-                              Acknowledge
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDashboardAcknowledge(incident.id)}
+                              disabled={dashboardActionLoading === incident.id}
+                            >
+                              {dashboardActionLoading === incident.id ? '...' : 'Acknowledge'}
                             </Button>
-                            <Button size="sm">
-                              Assign
+                            <Button
+                              size="sm"
+                              onClick={() => handleDashboardAssign(incident.id)}
+                              disabled={dashboardActionLoading === incident.id}
+                            >
+                              {dashboardActionLoading === incident.id ? '...' : 'Assign'}
                             </Button>
                           </>
                         )}
-                        <Button variant="ghost" size="sm">
+                        {incident.status === 'ACK' && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleDashboardClose(incident.id)}
+                            disabled={dashboardActionLoading === incident.id}
+                          >
+                            {dashboardActionLoading === incident.id ? '...' : 'Close'}
+                          </Button>
+                        )}
+                        {incident.status === 'CLOSED' && (
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800`}>
+                            {incident.status}
+                          </span>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => handleDashboardDetails(incident.id)}>
                           Details
                         </Button>
                       </div>

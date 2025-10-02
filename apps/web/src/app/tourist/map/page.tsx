@@ -173,10 +173,23 @@ export default function TouristMapPage() {
 
   // Initialize FCM and load data on mount
   useEffect(() => {
+    // Initialize tourist ID first for immediate availability
+    const initTouristId = async () => {
+      await extractTouristId();
+    };
+
+    initTouristId();
     loadZones();
-    extractTouristId();
     initializeNotifications();
   }, []);
+
+  // Auto-start location tracking when tourist ID becomes available
+  useEffect(() => {
+    if (touristId && !isTracking && !locationWatchId) {
+      console.log('🚀 Auto-starting location tracking...');
+      startLocationTracking();
+    }
+  }, [touristId, isTracking, locationWatchId]);
 
   // Set up FCM message listener
   useEffect(() => {
@@ -216,20 +229,20 @@ export default function TouristMapPage() {
   };
 
   const extractTouristId = async () => {
-    const vcJwt = getStoredVC();
-    if (!vcJwt) {
-      // No VC found - use demo mode
-      console.log('📱 No VC found in localStorage, using demo mode');
-      setTouristId('33333333-3333-3333-3333-333333333333');
-      setIsTracking(true);
-      toast('🎭 Demo Mode: Using Alice Tourist profile', {
-        duration: 4000,
-        icon: '👤'
-      });
-      return;
-    }
-
     try {
+      const vcJwt = getStoredVC();
+      if (!vcJwt) {
+        // No VC found - use demo mode immediately
+        console.log('📱 No VC found in localStorage, using demo mode');
+        setTouristId('33333333-3333-3333-3333-333333333333');
+        setIsTracking(true);
+        toast('🎭 Demo Mode: Using Alice Tourist profile', {
+          duration: 4000,
+          icon: '👤'
+        });
+        return;
+      }
+
       // Verify VC and get tourist ID
       const response = await fetch('/api/v1/vc/verify', {
         method: 'POST',
@@ -242,7 +255,7 @@ export default function TouristMapPage() {
         // For demo, we'll use one of the seeded tourist IDs
         setTouristId('33333333-3333-3333-3333-333333333333');
         setIsTracking(true);
-        
+
         toast.success('✅ Credential verified - Tracking started', {
           duration: 3000
         });
@@ -522,12 +535,74 @@ export default function TouristMapPage() {
 
   const handleSOS = async () => {
     console.log('🚨 handleSOS called!', { userLocation, touristId, showSOSConfirm });
-    if (!userLocation || !touristId) {
-      console.warn('❌ SOS failed: Missing location or tourist ID', { userLocation: !!userLocation, touristId: !!touristId });
-      toast.error('Location not available for SOS');
+
+    // Ensure tourist ID is available
+    if (!touristId) {
+      console.warn('❌ SOS failed: Tourist ID not initialized');
+      toast.error('Please wait for initialization or refresh the page');
       return;
     }
 
+    // Get location if not available
+    if (!userLocation) {
+      console.log('📍 Getting current location for SOS...');
+      toast('Getting your location for emergency services...', { duration: 2000 });
+
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          if (!navigator.geolocation) {
+            reject(new Error('Geolocation not supported'));
+            return;
+          }
+
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000 // Accept location up to 1 minute old
+          });
+        });
+
+        const { latitude, longitude } = position.coords;
+        // Update user location for future use
+        setUserLocation([longitude, latitude]);
+        console.log('✅ Got location for SOS:', { latitude, longitude });
+
+        // Send SOS with obtained location
+        await sendSOSAlert(touristId, latitude, longitude);
+      } catch (error) {
+        console.error('❌ Failed to get location for SOS:', error);
+
+        let errorMessage = 'Unable to get your location. ';
+
+        if (error instanceof GeolocationPositionError) {
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage += 'Location access denied. Please enable location permissions in your browser settings and refresh the page.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage += 'Location information is unavailable. Please check your device settings.';
+              break;
+            case error.TIMEOUT:
+              errorMessage += 'Location request timed out. Please try again.';
+              break;
+            default:
+              errorMessage += 'Please check your location settings and try again.';
+          }
+        } else {
+          errorMessage += 'Please ensure location services are enabled and try again.';
+        }
+
+        toast.error(errorMessage, { duration: 6000 });
+        return;
+      }
+    } else {
+      // Location already available, send SOS
+      await sendSOSAlert(touristId, userLocation[1], userLocation[0]);
+    }
+  };
+
+  // Helper function to send SOS alert
+  const sendSOSAlert = async (touristId: string, latitude: number, longitude: number) => {
     if (showSOSConfirm) {
       // Actually send SOS
       try {
@@ -537,8 +612,8 @@ export default function TouristMapPage() {
           body: JSON.stringify({
             tourist_id: touristId,
             type: 'SOS',
-            lat: userLocation[1], // latitude
-            lng: userLocation[0], // longitude
+            lat: latitude,
+            lng: longitude,
             severity: 'HIGH'
           })
         });
@@ -551,11 +626,26 @@ export default function TouristMapPage() {
             icon: '🚨'
           });
         } else {
-          throw new Error('Failed to send SOS');
+          throw new Error(`Failed to send SOS: ${response.statusText}`);
         }
       } catch (error) {
         console.error('SOS failed:', error);
-        toast.error('Failed to send SOS alert');
+
+        let errorMessage = 'Failed to send SOS alert. ';
+
+        if (error instanceof Error) {
+          if (error.message.includes('Failed to send SOS')) {
+            errorMessage += 'Emergency services may be unavailable. Please contact emergency services directly.';
+          } else if (error.message.includes('network') || error.message.includes('fetch')) {
+            errorMessage += 'Network error. Please check your connection and try again.';
+          } else {
+            errorMessage += 'Please try again or contact emergency services directly.';
+          }
+        } else {
+          errorMessage += 'Please try again or contact emergency services directly.';
+        }
+
+        toast.error(errorMessage, { duration: 6000 });
         setShowSOSConfirm(false);
       }
     } else {
@@ -616,6 +706,11 @@ export default function TouristMapPage() {
               }`}>
                 <div className={`h-2 w-2 rounded-full ${isTracking ? 'bg-blue-500' : 'bg-gray-500'}`}></div>
                 <span className="font-medium">{isTracking ? 'Live' : 'Paused'}</span>
+                {!isTracking && (
+                  <span className="text-xs text-gray-500 ml-1" title="Location tracking is recommended for SOS alerts">
+                    (SOS needs location)
+                  </span>
+                )}
               </div>
             </div>
 

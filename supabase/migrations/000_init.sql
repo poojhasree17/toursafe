@@ -201,7 +201,6 @@ create index on iot_devices (device_id);
 create index on iot_devices (status) where status = 'ACTIVE';
 create index on iot_data_points (device_id, recorded_at desc);
 create index on iot_data_points (data_type, recorded_at desc);
-create index on iot_data_points (recorded_at desc) where recorded_at > now() - interval '1 hour';
 create index on iot_alerts (device_id, created_at desc);
 create index on iot_alerts (alert_type);
 create index on iot_alerts (acknowledged) where acknowledged = false;
