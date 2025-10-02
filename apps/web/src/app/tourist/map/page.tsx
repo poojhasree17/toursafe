@@ -282,6 +282,7 @@ export default function TouristMapPage() {
       const response = await fetch('/api/v1/zones');
       if (response.ok) {
         const data = await response.json();
+        console.log('Loaded zones:', data.zones?.length || 0, data.zones);
         setZones(data.zones || []);
       } else {
         throw new Error('Failed to load zones');
@@ -520,7 +521,9 @@ export default function TouristMapPage() {
   };
 
   const handleSOS = async () => {
+    console.log('🚨 handleSOS called!', { userLocation, touristId, showSOSConfirm });
     if (!userLocation || !touristId) {
+      console.warn('❌ SOS failed: Missing location or tourist ID', { userLocation: !!userLocation, touristId: !!touristId });
       toast.error('Location not available for SOS');
       return;
     }
@@ -657,6 +660,15 @@ export default function TouristMapPage() {
           mapStyle={mapStyle}
           onMapStyleChange={handleMapStyleChange}
         />
+
+        {/* Debug info - remove in production */}
+        <div className="absolute top-20 right-4 bg-white/90 p-2 rounded text-xs z-40">
+          <div>Zones: {zones.length}</div>
+          <div>Location: {userLocation ? `${userLocation[0].toFixed(4)}, ${userLocation[1].toFixed(4)}` : 'None'}</div>
+          <div>Tracking: {isTracking ? 'ON' : 'OFF'}</div>
+          <div>TouristId: {touristId || 'None'}</div>
+          <div>SOS Confirm: {showSOSConfirm ? 'ON' : 'OFF'}</div>
+        </div>
 
 
         {/* Location Accuracy Indicator */}

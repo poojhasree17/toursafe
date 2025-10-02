@@ -38,9 +38,57 @@ export const mockData = {
   zones: [
     {
       id: '55555555-5555-5555-5555-555555555555',
-      name: 'Gateway of India Safe Zone',
+      name: 'Gateway of India Area',
       type: 'SAFE',
-      polygon_geojson: '{"type": "MultiPolygon", "coordinates": [[[[72.8347, 18.9220], [72.8360, 18.9220], [72.8360, 18.9200], [72.8347, 18.9200], [72.8347, 18.9220]]]]}'
+      polygon_geojson: {
+        "type": "MultiPolygon",
+        "coordinates": [[[
+          [72.8330, 18.9230],
+          [72.8360, 18.9230],
+          [72.8360, 18.9200],
+          [72.8330, 18.9200],
+          [72.8330, 18.9230]
+        ]]]
+      },
+      description: 'Tourist area around Gateway of India',
+      riskLevel: 'LOW',
+      incidentCount: 2
+    },
+    {
+      id: '66666666-6666-6666-6666-666666666666',
+      name: 'Mumbai Naval Base Restricted Zone',
+      type: 'RESTRICTED',
+      polygon_geojson: {
+        "type": "MultiPolygon",
+        "coordinates": [[[
+          [72.8370, 18.9250],
+          [72.8420, 18.9250],
+          [72.8420, 18.9180],
+          [72.8370, 18.9180],
+          [72.8370, 18.9250]
+        ]]]
+      },
+      description: 'Restricted naval area - entry prohibited',
+      riskLevel: 'HIGH',
+      incidentCount: 15
+    },
+    {
+      id: '77777777-7777-7777-7777-777777777777',
+      name: 'Colaba Market Alert Zone',
+      type: 'ALERT',
+      polygon_geojson: {
+        "type": "MultiPolygon",
+        "coordinates": [[[
+          [72.8300, 18.9180],
+          [72.8350, 18.9180],
+          [72.8350, 18.9100],
+          [72.8300, 18.9100],
+          [72.8300, 18.9180]
+        ]]]
+      },
+      description: 'Busy market area - be cautious of pickpockets',
+      riskLevel: 'MEDIUM',
+      incidentCount: 8
     }
   ],
   incidents: [

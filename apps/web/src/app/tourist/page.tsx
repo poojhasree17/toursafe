@@ -126,26 +126,30 @@ export default function TouristPage() {
     setLoading(true);
     simulateProgress(async () => {
       try {
-        // Issue a demo VC
-        const response = await fetch('/api/v1/vc/issue', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            displayName: 'Demo Tourist',
-            emergencyContact: '+1234567890'
-          })
-        });
+        // Create a simple demo VC for testing
+        const demoPayload = {
+          iss: 'Demo Tourism Authority',
+          sub: 'demo-tourist-123',
+          aud: 'toursafe-app',
+          exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
+          iat: Math.floor(Date.now() / 1000),
+          jti: 'demo-' + Date.now(),
+          displayName: 'Demo Tourist',
+          emergencyContact: '+1234567890',
+          touristId: 'demo-tourist-' + Date.now(),
+          name: 'Demo Tourist',
+          type: 'tourist-credential'
+        };
 
-        const result = await response.json();
+        // Create a simple JWT-like string for demo purposes
+        const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+        const payload = btoa(JSON.stringify(demoPayload));
+        const signature = btoa('demo-signature'); // Not a real signature, just for demo
+        const demoVcJwt = `${header}.${payload}.${signature}`;
 
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to issue demo VC');
-        }
-
-        setVcJwt(result.vcJwt);
-        storeVC(result.vcJwt);
-        const parsed = parseJWT(result.vcJwt);
-        setCredentialInfo(formatCredentialInfo(parsed));
+        setVcJwt(demoVcJwt);
+        storeVC(demoVcJwt);
+        setCredentialInfo(formatCredentialInfo(demoPayload));
         setHasVC(true);
         toast.success('Demo credential created!');
 

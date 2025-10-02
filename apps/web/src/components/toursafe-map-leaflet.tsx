@@ -16,6 +16,19 @@ const Polygon = dynamic(() => import('react-leaflet').then(mod => mod.Polygon), 
 // Import Leaflet CSS
 import 'leaflet/dist/leaflet.css';
 
+// Fix for default markers in Leaflet
+let DefaultIcon: any;
+if (typeof window !== 'undefined') {
+  const L = require('leaflet');
+  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
+    iconUrl: require('leaflet/dist/images/marker-icon.png'),
+    shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+  });
+  DefaultIcon = L.Icon.Default;
+}
+
 interface Zone {
   id: string;
   name: string;
@@ -74,7 +87,7 @@ const createUserIcon = () => {
       popupAnchor: [0, -12]
     });
   }
-  return null;
+  return DefaultIcon;
 };
 
 function ZonePolygon({ zone, onZoneSelect }: { zone: Zone; onZoneSelect?: (zone: Zone) => void }) {
@@ -118,14 +131,20 @@ function ZonePolygon({ zone, onZoneSelect }: { zone: Zone; onZoneSelect?: (zone:
   );
 }
 
-function SOSButton({ onSOSClick }: { onSOSClick?: () => void }) {
+function SOSButton({ onSOSClick, showSOS }: { onSOSClick?: () => void; showSOS?: boolean }) {
+  if (!showSOS) return null;
+
   return (
-    <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-50">
+    <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 z-[9999] pointer-events-auto">
       <Button
         variant="destructive"
         size="lg"
-        onClick={onSOSClick}
+        onClick={() => {
+          console.log('🆘 SOS Button clicked!');
+          onSOSClick?.();
+        }}
         className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold py-4 px-8 rounded-full shadow-2xl border-2 border-red-400 animate-pulse hover:animate-none transition-all duration-300"
+        title="Emergency SOS - Click to send emergency alert"
       >
         <div className="flex items-center space-x-3">
           <div className="relative">
@@ -241,13 +260,16 @@ export function TourSafeMap({
         />
 
         {/* Render safety zones */}
-        {zones.map((zone) => (
-          <ZonePolygon
-            key={zone.id}
-            zone={zone}
-            onZoneSelect={onZoneSelect}
-          />
-        ))}
+        {zones.map((zone) => {
+          console.log('Rendering zone:', zone.name, zone.polygon_geojson.coordinates);
+          return (
+            <ZonePolygon
+              key={zone.id}
+              zone={zone}
+              onZoneSelect={onZoneSelect}
+            />
+          );
+        })}
 
         {/* User location marker */}
         {userLocation && (
@@ -290,6 +312,20 @@ export function TourSafeMap({
         >
           <Shield className={`h-4 w-4 ${isTracking ? 'text-white' : 'text-green-600'}`} />
         </Button>
+
+        {/* Emergency SOS Button in Controls */}
+        <Button
+          variant="destructive"
+          size="icon"
+          onClick={() => {
+            console.log('🆘 SOS Icon Button clicked!');
+            onSOSClick?.();
+          }}
+          title="Emergency SOS Alert"
+          className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg border border-red-400 animate-pulse"
+        >
+          <AlertTriangle className="h-4 w-4 text-white" />
+        </Button>
       </div>
 
       {/* Map Style Toggle */}
@@ -316,10 +352,8 @@ export function TourSafeMap({
         </div>
       </div>
 
-      {/* SOS Button */}
-      {showSOS && (
-        <SOSButton onSOSClick={onSOSClick} />
-      )}
+      {/* SOS Button - Conditionally visible for safety */}
+      <SOSButton onSOSClick={onSOSClick} showSOS={showSOS} />
 
       {/* Zone Legend */}
       {zones.length > 0 && (
