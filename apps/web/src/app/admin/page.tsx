@@ -218,6 +218,28 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDashboardAssign = async (incidentId: string) => {
+    try {
+      setDashboardActionLoading(incidentId);
+
+      // Update incident status to ASSIGNED in database
+      const { error } = await supabase
+        .from('incidents')
+        .update({ status: 'ASSIGNED', updated_at: new Date().toISOString() })
+        .eq('id', incidentId);
+
+      if (error) throw error;
+
+      toast.success('Incident assigned successfully');
+      loadIncidents(); // Refresh the list
+    } catch (error) {
+      console.error('Error assigning incident:', error);
+      toast.error('Failed to assign incident');
+    } finally {
+      setDashboardActionLoading(null);
+    }
+  };
+
   const handleDashboardDetails = (incidentId: string) => {
     // Navigate to detailed incident view
     router.push(`/admin/incidents/${incidentId}`);

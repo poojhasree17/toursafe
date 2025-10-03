@@ -398,26 +398,36 @@ export default function TouristMapPage() {
         if (result.zonesHit && result.zonesHit.length > 0) {
           result.zonesHit.forEach((zone: any) => {
             if (zone.type === 'RESTRICTED') {
-              toast.error(`⚠️ Restricted Area: ${zone.name}`, {
-                duration: 5000,
+              toast.error(`🚫 RESTRICTED ZONE: ${zone.name}\n\n${zone.description || 'This area is restricted for safety reasons.'}\n\nLeave immediately and contact authorities if needed.`, {
+                duration: 8000,
                 className: 'toast-danger',
                 icon: '🚫'
               });
               setTripStats(prev => ({
                 ...prev,
                 alertsReceived: prev.alertsReceived + 1,
-                safetyScore: Math.max(0, prev.safetyScore - 10)
+                safetyScore: Math.max(0, prev.safetyScore - 15)
               }));
             } else if (zone.type === 'ALERT') {
-              toast('⚡ Caution: Alert Zone Detected', {
-                duration: 4000,
+              toast(`⚠️ CAUTION: ${zone.name}\n\n${zone.description || 'Exercise caution in this area.'}\n\nRisk Level: ${zone.riskLevel || 'MEDIUM'}`, {
+                duration: 6000,
                 className: 'toast-warning',
                 icon: '⚠️'
               });
               setTripStats(prev => ({
                 ...prev,
                 alertsReceived: prev.alertsReceived + 1,
-                safetyScore: Math.max(0, prev.safetyScore - 5)
+                safetyScore: Math.max(0, prev.safetyScore - 8)
+              }));
+            } else if (zone.type === 'SAFE') {
+              toast.success(`✅ Safe Zone: ${zone.name}\n\n${zone.description || 'You are in a monitored safe area.'}`, {
+                duration: 3000,
+                className: 'toast-success',
+                icon: '✅'
+              });
+              setTripStats(prev => ({
+                ...prev,
+                safetyScore: Math.min(100, prev.safetyScore + 2)
               }));
             }
           });
@@ -954,21 +964,21 @@ export default function TouristMapPage() {
         )}
       </div>
 
-      {/* Zone Details Modal */}
+      {/* Enhanced Zone Details Modal */}
       {showZoneDetails && selectedZone && (
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="max-w-lg w-full bg-white/95 backdrop-blur-md shadow-2xl border-0">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center space-x-2">
-                  <div className={`p-2 rounded-full ${
+                  <div className={`p-3 rounded-full ${
                     selectedZone.type === 'SAFE' ? 'bg-green-100 text-green-600' :
                     selectedZone.type === 'ALERT' ? 'bg-yellow-100 text-yellow-600' :
                     'bg-red-100 text-red-600'
                   }`}>
-                    {selectedZone.type === 'SAFE' ? <CheckCircle className="h-5 w-5" /> :
-                     selectedZone.type === 'ALERT' ? <AlertCircle className="h-5 w-5" /> :
-                     <XCircle className="h-5 w-5" />}
+                    {selectedZone.type === 'SAFE' ? <CheckCircle className="h-6 w-6" /> :
+                     selectedZone.type === 'ALERT' ? <AlertCircle className="h-6 w-6" /> :
+                     <XCircle className="h-6 w-6" />}
                   </div>
                   <span>{selectedZone.name}</span>
                 </CardTitle>
@@ -982,10 +992,11 @@ export default function TouristMapPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Zone Type and Risk Level */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm font-medium text-gray-600">Type</div>
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-sm font-medium text-gray-600">Zone Type</div>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mt-1 ${
                     selectedZone.type === 'SAFE' ? 'bg-green-100 text-green-800' :
                     selectedZone.type === 'ALERT' ? 'bg-yellow-100 text-yellow-800' :
                     'bg-red-100 text-red-800'
@@ -993,9 +1004,9 @@ export default function TouristMapPage() {
                     {selectedZone.type}
                   </span>
                 </div>
-                <div>
+                <div className="bg-gray-50 rounded-lg p-3">
                   <div className="text-sm font-medium text-gray-600">Risk Level</div>
-                  <div className={`font-medium ${
+                  <div className={`font-semibold mt-1 ${
                     selectedZone.riskLevel === 'LOW' ? 'text-green-600' :
                     selectedZone.riskLevel === 'MEDIUM' ? 'text-yellow-600' :
                     selectedZone.riskLevel === 'HIGH' ? 'text-orange-600' :
@@ -1006,27 +1017,72 @@ export default function TouristMapPage() {
                 </div>
               </div>
 
+              {/* Description */}
               {selectedZone.description && (
-                <div>
-                  <div className="text-sm font-medium text-gray-600 mb-2">Description</div>
-                  <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="text-sm font-medium text-blue-900 mb-2">Zone Information</div>
+                  <p className="text-sm text-blue-800">
                     {selectedZone.description}
                   </p>
                 </div>
               )}
 
+              {/* Safety Guidelines */}
+              <div className="bg-amber-50 rounded-lg p-4">
+                <div className="text-sm font-medium text-amber-900 mb-2">Safety Guidelines</div>
+                <div className="space-y-2 text-sm text-amber-800">
+                  {selectedZone.type === 'SAFE' && (
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span>Monitored safe area with regular patrols</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span>Emergency services readily available</span>
+                      </div>
+                    </>
+                  )}
+                  {selectedZone.type === 'ALERT' && (
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <AlertCircle className="h-4 w-4 text-yellow-600" />
+                        <span>Exercise caution and stay aware</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <AlertCircle className="h-4 w-4 text-yellow-600" />
+                        <span>Avoid isolated areas after dark</span>
+                      </div>
+                    </>
+                  )}
+                  {selectedZone.type === 'RESTRICTED' && (
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <XCircle className="h-4 w-4 text-red-600" />
+                        <span>Access prohibited - leave immediately</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <XCircle className="h-4 w-4 text-red-600" />
+                        <span>Contact authorities if assistance needed</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Statistics */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm font-medium text-gray-600">Last Updated</div>
-                  <div className="text-sm text-gray-900">
+                <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <div className="text-lg font-bold text-gray-900">
+                    {selectedZone.incidentCount || 0}
+                  </div>
+                  <div className="text-xs text-gray-600">Incidents Reported</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <div className="text-lg font-bold text-gray-900">
                     {selectedZone.lastUpdated ? new Date(selectedZone.lastUpdated).toLocaleDateString() : 'N/A'}
                   </div>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-600">Incidents</div>
-                  <div className="text-sm text-gray-900">
-                    {selectedZone.incidentCount || 0} reported
-                  </div>
+                  <div className="text-xs text-gray-600">Last Updated</div>
                 </div>
               </div>
             </CardContent>

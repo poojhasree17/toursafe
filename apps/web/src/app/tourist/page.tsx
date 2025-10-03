@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@toursafe/ui';
-import { Shield, Upload, QrCode, CheckCircle, AlertCircle, Camera, Eye, EyeOff, Copy, RefreshCw, Info, Globe, Clock, User, Phone } from 'lucide-react';
+import { Shield, Upload, QrCode, CheckCircle, AlertCircle, Camera, Eye, EyeOff, Copy, RefreshCw, Info, Globe, Clock, User, Phone, Zap, MapPin, Activity, TrendingUp, Bell } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { getStoredVC, storeVC } from '../../lib/utils';
+import { getStoredVC, storeVC, calculateTouristSafetyScore } from '../../lib/utils';
 import toast from 'react-hot-toast';
 
 export default function TouristPage() {
@@ -17,6 +17,10 @@ export default function TouristPage() {
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [importMethod, setImportMethod] = useState<'paste' | 'qr' | 'demo'>('paste');
+  const [safetyScore, setSafetyScore] = useState<any>(null);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [showSOSConfirm, setShowSOSConfirm] = useState(false);
+  const [zones, setZones] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
@@ -33,7 +37,60 @@ export default function TouristPage() {
         console.error('Failed to parse stored VC:', error);
       }
     }
+
+    // Load safety zones for safety score calculation
+    loadZones();
   }, []);
+
+  // Load zones for safety score calculation
+  const loadZones = async () => {
+    try {
+      const response = await fetch('/api/v1/zones');
+      if (response.ok) {
+        const data = await response.json();
+        setZones(data.zones || []);
+      }
+    } catch (error) {
+      console.error('Failed to load zones:', error);
+    }
+  };
+
+  // Calculate safety score when location changes
+  useEffect(() => {
+    if (userLocation && zones.length > 0) {
+      const score = calculateTouristSafetyScore(
+        { lat: userLocation[1], lng: userLocation[0] },
+        zones,
+        [],
+        new Date()
+      );
+      setSafetyScore(score);
+    }
+  }, [userLocation, zones]);
+
+  // Get user's current location for safety score
+  const getCurrentLocation = async () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by this browser');
+      return;
+    }
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      setUserLocation([longitude, latitude]); // [lng, lat] for the map component
+    } catch (error) {
+      console.error('Failed to get location:', error);
+      toast.error('Unable to get your location for safety score calculation');
+    }
+  };
 
   const parseJWT = (token: string) => {
     try {
@@ -200,6 +257,77 @@ export default function TouristPage() {
     }
   };
 
+  // SOS Alert functionality
+  const sendSOSAlert = async (latitude: number, longitude: number) => {
+    if (showSOSConfirm) {
+      try {
+        const response = await fetch('/api/v1/incidents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tourist_id: credentialInfo?.touristId || 'demo-tourist',
+            type: 'SOS',
+            lat: latitude,
+            lng: longitude,
+            severity: 'HIGH'
+          })
+        });
+
+        if (response.ok) {
+          setShowSOSConfirm(false);
+          toast.success('🆘 SOS Alert Sent! Emergency services have been notified.', {
+            duration: 5000,
+            icon: '🚨'
+          });
+        } else {
+          throw new Error(`Failed to send SOS: ${response.statusText}`);
+        }
+      } catch (error) {
+        console.error('SOS failed:', error);
+        toast.error('Failed to send SOS alert. Please contact emergency services directly.', {
+          duration: 6000
+        });
+        setShowSOSConfirm(false);
+      }
+    } else {
+      setShowSOSConfirm(true);
+    }
+  };
+
+  const handleSOS = async () => {
+    if (!userLocation) {
+      toast('Getting your location for emergency services...', { duration: 2000 });
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          if (!navigator.geolocation) {
+            reject(new Error('Geolocation not supported'));
+            return;
+          }
+
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000
+          });
+        });
+
+        const { latitude, longitude } = position.coords;
+        setUserLocation([longitude, latitude]);
+        await sendSOSAlert(latitude, longitude);
+      } catch (error) {
+        console.error('Failed to get location for SOS:', error);
+        toast.error('Unable to get your location. Please ensure location services are enabled.', { duration: 6000 });
+        return;
+      }
+    } else {
+      await sendSOSAlert(userLocation[1], userLocation[0]);
+    }
+  };
+
+  const cancelSOS = () => {
+    setShowSOSConfirm(false);
+  };
+
   if (hasVC && credentialInfo) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
@@ -214,6 +342,58 @@ export default function TouristPage() {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back!</h1>
               <p className="text-emerald-700 font-medium">Your tourist credential is active</p>
             </div>
+
+            {/* Safety Score Card */}
+            {safetyScore && (
+              <Card className={`backdrop-blur-sm shadow-xl border-0 mb-6 ${
+                safetyScore.score >= 80 ? 'bg-green-50/80' :
+                safetyScore.score >= 60 ? 'bg-yellow-50/80' :
+                safetyScore.score >= 40 ? 'bg-orange-50/80' : 'bg-red-50/80'
+              }`}>
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center text-lg">
+                    <Activity className={`h-5 w-5 mr-2 ${
+                      safetyScore.score >= 80 ? 'text-green-600' :
+                      safetyScore.score >= 60 ? 'text-yellow-600' :
+                      safetyScore.score >= 40 ? 'text-orange-600' : 'text-red-600'
+                    }`} />
+                    Safety Score
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center">
+                    <div className={`text-4xl font-bold mb-2 ${
+                      safetyScore.score >= 80 ? 'text-green-600' :
+                      safetyScore.score >= 60 ? 'text-yellow-600' :
+                      safetyScore.score >= 40 ? 'text-orange-600' : 'text-red-600'
+                    }`}>
+                      {safetyScore.score}
+                    </div>
+                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      safetyScore.riskLevel === 'LOW' ? 'bg-green-100 text-green-800' :
+                      safetyScore.riskLevel === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
+                      safetyScore.riskLevel === 'HIGH' ? 'bg-orange-100 text-orange-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {safetyScore.riskLevel} RISK
+                    </div>
+                    {!userLocation && (
+                      <div className="mt-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={getCurrentLocation}
+                          className="text-xs"
+                        >
+                          <MapPin className="h-3 w-3 mr-1" />
+                          Update Location
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Credential Card */}
             <Card className="backdrop-blur-sm bg-white/80 shadow-xl border-0 mb-6">
@@ -279,6 +459,17 @@ export default function TouristPage() {
                 <Shield className="h-5 w-5 mr-2" />
                 Explore Safety Map
               </Button>
+
+              {/* Emergency SOS Button */}
+              <Button
+                onClick={handleSOS}
+                className="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white font-semibold py-3 animate-pulse"
+                size="lg"
+              >
+                <Zap className="h-5 w-5 mr-2" />
+                {showSOSConfirm ? 'Confirm SOS Alert' : 'Emergency SOS'}
+              </Button>
+
               <Button
                 variant="outline"
                 onClick={() => router.push('/tourist/settings')}
@@ -298,6 +489,54 @@ export default function TouristPage() {
             </div>
           </div>
         </div>
+
+        {/* SOS Confirmation Dialog */}
+        {showSOSConfirm && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <Card className="max-w-md w-full bg-white/95 backdrop-blur-md shadow-2xl border-0">
+              <CardHeader className="text-center pb-4">
+                <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                  <Zap className="h-8 w-8 text-red-600" />
+                </div>
+                <CardTitle className="text-xl text-red-900">Emergency SOS Alert</CardTitle>
+                <CardDescription className="text-gray-600">
+                  This will immediately notify emergency services and your registered contacts
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-red-100 text-red-600 rounded-full">
+                      <Phone className="h-4 w-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-medium text-red-900">Emergency Contact</div>
+                      <div className="text-sm text-red-700">{credentialInfo?.emergencyContact || 'Not provided'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={cancelSOS}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleSOS}
+                    className="flex-1 bg-red-600 hover:bg-red-700"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Send SOS Alert
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     );
   }
