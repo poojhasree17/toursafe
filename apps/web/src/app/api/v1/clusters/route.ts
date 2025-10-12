@@ -11,16 +11,21 @@ export async function GET(request: NextRequest) {
 
     if (touristsError) throw touristsError;
 
-    // Fetch latest location for each tourist
+    // Fetch latest location for each tourist from pings table
     const touristLocations = await Promise.all(
       (tourists || []).map(async (tourist) => {
-        const { data: location } = await supabaseAdmin
-          .from('iot_data')
+        const { data: location, error: locationError } = await supabaseAdmin
+          .from('pings')
           .select('lat, lng, ts')
           .eq('tourist_id', tourist.id)
           .order('ts', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
+
+        // Suppress 404 errors for tourists without location data
+        if (locationError && locationError.code !== 'PGRST116') {
+          console.debug('Location fetch error for tourist', tourist.id, locationError);
+        }
 
         return location ? {
           touristId: tourist.id,

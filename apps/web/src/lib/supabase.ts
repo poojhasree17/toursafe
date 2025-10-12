@@ -19,8 +19,15 @@ function getSupabaseClient() {
         persistSession: typeof window !== 'undefined',
         autoRefreshToken: typeof window !== 'undefined',
         storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-        storageKey: 'supabase.auth.token',
+        storageKey: 'toursafe-supabase-auth',
+        detectSessionInUrl: true,
+        flowType: 'pkce',
       },
+      global: {
+        headers: {
+          'x-client-info': 'toursafe-web@1.0.0'
+        }
+      }
     });
   }
   return global.__supabaseClient;

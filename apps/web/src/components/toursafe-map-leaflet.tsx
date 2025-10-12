@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, forwardRef } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@toursafe/ui';
 import { AlertTriangle, Shield, Navigation, Layers, Satellite, Map as MapIcon } from 'lucide-react';
@@ -158,7 +158,7 @@ function SOSButton({ onSOSClick, showSOS }: { onSOSClick?: () => void; showSOS?:
   );
 }
 
-export function TourSafeMap({
+export const TourSafeMap = forwardRef<any, MapProps>(function TourSafeMap({
   center = [18.9220, 72.8347], // Mumbai coordinates [lat, lng]
   zoom = 14,
   zones = [],
@@ -171,7 +171,7 @@ export function TourSafeMap({
   onZoneSelect,
   mapStyle = 'streets',
   onMapStyleChange
-}: MapProps) {
+}, ref) {
   const mapRef = useRef<any>(null);
   const [isClient, setIsClient] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -375,4 +375,4 @@ export function TourSafeMap({
       )}
     </div>
   );
-}
+});

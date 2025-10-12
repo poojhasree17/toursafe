@@ -10,12 +10,16 @@ export const metadata: Metadata = {
   description: 'AI-powered tourist safety and incident response system',
   manifest: '/manifest.json',
   appleWebApp: {
+    capable: true,
     statusBarStyle: 'default',
     title: 'TourSafe',
   },
   icons: {
     icon: '/icon.svg',
     apple: '/icon.svg',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
   },
 };
 

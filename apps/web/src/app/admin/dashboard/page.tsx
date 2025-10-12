@@ -180,16 +180,21 @@ export default function PoliceDashboard() {
 
       if (error) throw error;
 
-      // Enrich with location data from iot_data table
+      // Enrich with location data from pings table
       const touristsWithLocation = await Promise.all(
         (data || []).map(async (tourist) => {
-          const { data: locationData } = await supabase
-            .from('iot_data')
+          const { data: locationData, error: locationError } = await supabase
+            .from('pings')
             .select('lat, lng, ts')
             .eq('tourist_id', tourist.id)
             .order('ts', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
+
+          // Suppress 404 errors silently - tourist may not have location data yet
+          if (locationError && locationError.code !== 'PGRST116') {
+            console.debug('Location fetch error for tourist', tourist.id, locationError);
+          }
 
           return {
             ...tourist,

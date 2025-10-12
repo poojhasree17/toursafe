@@ -91,9 +91,9 @@ export async function GET(request: NextRequest) {
       });
 
     } else if (type === 'tourists') {
-      // Fetch latest tourist locations
+      // Fetch latest tourist locations from pings table
       const { data: locations, error } = await supabaseAdmin
-        .from('iot_data')
+        .from('pings')
         .select('tourist_id, lat, lng, ts')
         .gte('ts', startTime.toISOString())
         .order('ts', { ascending: false });
