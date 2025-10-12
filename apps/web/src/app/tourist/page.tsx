@@ -492,7 +492,7 @@ export default function TouristPage() {
 
         {/* SOS Confirmation Dialog */}
         {showSOSConfirm && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
             <Card className="max-w-md w-full bg-white/95 backdrop-blur-md shadow-2xl border-0">
               <CardHeader className="text-center pb-4">
                 <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">

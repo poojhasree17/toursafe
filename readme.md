@@ -55,6 +55,17 @@ flowchart LR
 - **🔗 Blockchain Audit** - Verify credentials and incident integrity
 - **📈 Reporting** - Export data and incident reports
 
+### Police & Tourism Department Dashboard
+- **🚔 Real-time Visualizations** - Comprehensive monitoring with live updates
+- **👥 Tourist Clusters** - Grid-based clustering with density analysis
+- **🗺️ Risk Heat Maps** - Geographic visualization of high-risk zones
+- **🔍 Digital ID Records** - Advanced search, filtering, and tracking
+- **📍 Last Known Locations** - Real-time location tracking for all tourists
+- **📋 Alert History** - Complete incident log with full details
+- **⚡ Automated E-FIR** - One-click E-FIR generation for missing persons
+- **📊 Analytics Dashboard** - Statistics, trends, and insights
+- **📤 Data Export** - Export complete dashboard data for reports
+
 ### AI Anomaly Detection
 - **🤖 Machine Learning** - IsolationForest for movement analysis
 - **📊 Rule-based Detection** - Immobility and deviation patterns
@@ -233,11 +244,25 @@ GET  /api/v1/incidents       # List incidents
 POST /api/v1/incidents       # Create incident (SOS)
 PATCH /api/v1/incidents/:id  # Update incident status
 
+# E-FIR System
+POST /api/v1/efir            # Generate E-FIR
+GET  /api/v1/efir            # Get E-FIRs by tourist
+PATCH /api/v1/efir           # Update E-FIR status
+
+# Police Dashboard
+GET  /api/v1/analytics       # Dashboard analytics
+GET  /api/v1/heatmap         # Risk heat map data
+GET  /api/v1/clusters        # Tourist clusters
+
 # AI Analysis
 POST /ai/score               # Analyze GPS patterns
 ```
 
-See [API.md](docs/API.md) for detailed documentation.
+See [API.md](docs/API.md) for detailed API documentation.
+
+For Police Dashboard documentation, see:
+- [POLICE_DASHBOARD.md](docs/POLICE_DASHBOARD.md) - Complete feature documentation
+- [POLICE_DASHBOARD_QUICK_REFERENCE.md](docs/POLICE_DASHBOARD_QUICK_REFERENCE.md) - Quick reference guide
 
 ## 🎭 Demo Scenarios
 
