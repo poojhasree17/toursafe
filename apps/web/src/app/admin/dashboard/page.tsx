@@ -491,9 +491,17 @@ export default function PoliceDashboard() {
             <div className="bg-white rounded-lg shadow">
               <div className="p-4 border-b">
                 <h3 className="text-lg font-semibold">Tourist Clusters & Locations</h3>
-                <p className="text-sm text-gray-500">
-                  {clusterData?.summary?.totalTourists || 0} tourists in {clusterData?.summary?.totalClusters || 0} clusters
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-500">
+                    {clusterData?.summary?.totalTourists || 0} tourists with location data in {clusterData?.summary?.totalClusters || 0} clusters
+                  </p>
+                  {stats.activeTourists > (clusterData?.summary?.totalTourists || 0) && (
+                    <span className="text-xs text-amber-600 flex items-center">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      {stats.activeTourists - (clusterData?.summary?.totalTourists || 0)} tourist(s) without GPS data
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="h-96">
                 <TourSafeMap
@@ -504,20 +512,28 @@ export default function PoliceDashboard() {
                 />
               </div>
               <div className="p-4 border-t bg-gray-50">
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-red-600">{clusterData?.summary?.highDensityClusters || 0}</div>
-                    <div className="text-gray-600">High Density</div>
+                {clusterData?.summary?.totalClusters > 0 ? (
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-red-600">{clusterData?.summary?.highDensityClusters || 0}</div>
+                      <div className="text-gray-600">High Density</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-yellow-600">{clusterData?.summary?.mediumDensityClusters || 0}</div>
+                      <div className="text-gray-600">Medium Density</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-green-600">{clusterData?.summary?.lowDensityClusters || 0}</div>
+                      <div className="text-gray-600">Low Density</div>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-yellow-600">{clusterData?.summary?.mediumDensityClusters || 0}</div>
-                    <div className="text-gray-600">Medium Density</div>
+                ) : (
+                  <div className="text-center py-4">
+                    <MapPin className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No location data available</p>
+                    <p className="text-xs text-gray-400 mt-1">Tourists need to enable GPS tracking in their app</p>
                   </div>
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-green-600">{clusterData?.summary?.lowDensityClusters || 0}</div>
-                    <div className="text-gray-600">Low Density</div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
