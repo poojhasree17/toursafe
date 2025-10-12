@@ -39,44 +39,57 @@ export default function IncidentsPage() {
   const loadIncidents = async () => {
     try {
       setLoading(true);
-      // For demo purposes, we'll use mock data that matches the API structure
-      // In production, this would fetch from your Supabase API
-      const mockIncidents: Incident[] = [
-        {
-          id: '1',
-          type: 'RESTRICTED',
-          severity: 'MEDIUM',
-          tourist: 'Bob Explorer',
-          location: '18.9248, 72.8378',
-          status: 'OPEN',
-          timestamp: '2 minutes ago',
-          description: 'Tourist approaching restricted naval area'
-        },
-        {
-          id: '2',
-          type: 'SOS',
-          severity: 'HIGH',
-          tourist: 'Alice Tourist',
-          location: '18.9200, 72.8400',
-          status: 'ACK',
-          timestamp: '5 minutes ago',
-          description: 'Emergency SOS alert received'
-        },
-        {
-          id: '3',
-          type: 'IMMOBILE',
-          severity: 'HIGH',
-          tourist: 'Charlie Visitor',
-          location: '18.9250, 72.8350',
-          status: 'CLOSED',
-          timestamp: '10 minutes ago',
-          description: 'Tourist has been immobile for 8 minutes'
-        }
-      ];
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setIncidents(mockIncidents);
+      // Fetch real incidents from Supabase
+      const { data: incidentsData, error } = await supabase
+        .from('incidents')
+        .select(`
+          id,
+          type,
+          severity,
+          lat,
+          lng,
+          status,
+          ts,
+          tourists(display_name),
+          meta
+        `)
+        .order('ts', { ascending: false });
+
+      if (error) {
+        console.error('Failed to fetch incidents:', error);
+        toast.error('Failed to load incidents');
+        return;
+      }
+
+      if (incidentsData && incidentsData.length > 0) {
+        const formattedIncidents: Incident[] = incidentsData.map(incident => ({
+          id: incident.id,
+          type: incident.type,
+          severity: incident.severity,
+          tourist: incident.tourists?.display_name || 'Unknown Tourist',
+          location: incident.lat && incident.lng ? `${incident.lat}, ${incident.lng}` : 'Unknown',
+          status: incident.status,
+          timestamp: new Date(incident.ts).toLocaleString(),
+          description: incident.meta?.description || `${incident.type} incident reported`
+        }));
+        setIncidents(formattedIncidents);
+      } else {
+        // Fallback to mock data if no real incidents exist
+        const mockIncidents: Incident[] = [
+          {
+            id: '1',
+            type: 'RESTRICTED',
+            severity: 'MEDIUM',
+            tourist: 'Bob Explorer',
+            location: '18.9248, 72.8378',
+            status: 'OPEN',
+            timestamp: '2 minutes ago',
+            description: 'Tourist approaching restricted naval area'
+          }
+        ];
+        setIncidents(mockIncidents);
+      }
     } catch (error) {
       console.error('Failed to load incidents:', error);
       toast.error('Failed to load incidents');
