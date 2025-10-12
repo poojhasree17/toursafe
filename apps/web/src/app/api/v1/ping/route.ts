@@ -108,16 +108,46 @@ export async function POST(request: NextRequest) {
     }
 
     // Get recent pings for AI analysis
+    console.log('🔍 Fetching recent pings for tourist:', tourist_id);
     const { data: recentPings, error: recentError } = await supabaseAdmin
       .rpc('get_recent_pings', {
         tourist_uuid: tourist_id,
         minutes_back: 10
       });
 
+    if (recentError) {
+      console.error('❌ RPC Error getting recent pings:', recentError);
+    }
+
+    console.log('🤖 AI Analysis Check:', {
+      error: recentError,
+      pingCount: recentPings?.length || 0,
+      recentPingsData: recentPings?.map((p: any) => ({
+        ts: p.ts,
+        lat: p.lat,
+        lng: p.lng
+      })),
+      willAnalyze: !recentError && recentPings && recentPings.length >= 5,
+      aiServiceUrl: process.env.AI_SERVICE_URL || 'http://localhost:8000/score'
+    });
+
     if (!recentError && recentPings && recentPings.length >= 5) {
       // Call AI service for anomaly detection
+      const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:8000/score';
+      console.log('📡 Calling AI service with', recentPings.length, 'pings...');
+      console.log('🔗 AI Service URL:', aiServiceUrl);
+      console.log('📦 Payload:', JSON.stringify({
+        pings: recentPings.map((p: Ping) => ({
+          ts: p.ts,
+          lat: p.lat,
+          lng: p.lng,
+          speed: p.speed,
+          bearing: p.bearing
+        }))
+      }, null, 2));
+      
       try {
-        const aiResponse = await fetch(process.env.AI_SERVICE_URL || 'http://localhost:8000/score', {
+        const aiResponse = await fetch(aiServiceUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -133,8 +163,16 @@ export async function POST(request: NextRequest) {
           })
         });
 
+        console.log('🌐 AI Response Status:', aiResponse.status, aiResponse.statusText);
+        console.log('📋 AI Response Headers:', Object.fromEntries(aiResponse.headers.entries()));
+
         if (aiResponse.ok) {
           const aiResult = await aiResponse.json();
+          console.log('✅ AI Analysis Result:', {
+            verdict: aiResult.verdict,
+            score: aiResult.score,
+            reason: aiResult.reason
+          });
           
           // Create incidents for AI-detected anomalies
           if (aiResult.verdict !== 'OK' && !incidentCreated) {
@@ -202,11 +240,22 @@ export async function POST(request: NextRequest) {
                 });
             }
           }
+        } else {
+          const errorText = await aiResponse.text();
+          console.error('❌ AI service returned error:', aiResponse.status, aiResponse.statusText);
+          console.error('❌ Error response body:', errorText);
         }
       } catch (aiError) {
-        console.error('AI service call failed:', aiError);
+        console.error('❌ AI service call failed:', aiError);
+        console.error('❌ Error details:', {
+          name: aiError instanceof Error ? aiError.name : 'Unknown',
+          message: aiError instanceof Error ? aiError.message : String(aiError),
+          stack: aiError instanceof Error ? aiError.stack : undefined
+        });
         // Continue without AI analysis
       }
+    } else if (recentPings && recentPings.length < 5) {
+      console.log(`⏳ Waiting for more pings... (${recentPings.length}/5 needed for AI analysis)`);
     }
 
     return NextResponse.json({

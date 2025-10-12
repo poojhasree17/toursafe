@@ -16,12 +16,29 @@ from pydantic import BaseModel, Field
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 
-# Configure logging
+# Configure logging with immediate flush
+import sys
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout,
+    force=True
 )
 logger = logging.getLogger(__name__)
+
+# Force flush after each log
+class FlushHandler(logging.StreamHandler):
+    def emit(self, record):
+        super().emit(record)
+        self.flush()
+
+# Replace default handler with flush handler
+logger.handlers = []
+flush_handler = FlushHandler(sys.stdout)
+flush_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(flush_handler)
+logger.setLevel(logging.INFO)
 
 app = FastAPI(
     title="TourSafe AI Service",

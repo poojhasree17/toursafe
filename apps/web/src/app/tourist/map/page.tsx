@@ -85,6 +85,19 @@ export default function TouristMapPage() {
 
   const mapRef = useRef<HTMLDivElement>(null);
   const statsIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Use refs to avoid closure issues in geolocation callback
+  const isTrackingRef = useRef(isTracking);
+  const touristIdRef = useRef(touristId);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+  }, [isTracking]);
+
+  useEffect(() => {
+    touristIdRef.current = touristId;
+  }, [touristId]);
 
   // Map style change handler
   const handleMapStyleChange = (newStyle: 'streets' | 'satellite' | 'terrain') => {
@@ -387,29 +400,46 @@ export default function TouristMapPage() {
       }));
     }
 
-    if (!isTracking || !touristId) {
+    // Use refs to get current values (fixes closure issue)
+    const currentIsTracking = isTrackingRef.current;
+    const currentTouristId = touristIdRef.current;
+
+    console.log('🔍 Ping check:', { 
+      isTracking: currentIsTracking, 
+      touristId: currentTouristId,
+      willSendPing: currentIsTracking && !!currentTouristId 
+    });
+
+    if (!currentIsTracking || !currentTouristId) {
       console.log('⏸️ Skipping ping - tracking inactive or no tourist ID');
       return;
     }
 
     try {
       console.log('📡 Sending location ping to server...', {
-        tourist_id: touristId,
+        tourist_id: currentTouristId,
         lat: lat.toFixed(6),
         lng: lng.toFixed(6)
       });
 
+      const pingData: any = {
+        tourist_id: currentTouristId,
+        lat,
+        lng
+      };
+      
+      // Only include optional fields if they have valid values
+      if (speed !== undefined && speed !== null) {
+        pingData.speed = speed;
+      }
+      // Note: bearing is not available from browser geolocation API
+      
+      console.log('📦 Ping payload:', pingData);
+
       const response = await fetch('/api/v1/ping', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tourist_id: touristId,
-          lat,
-          lng,
-          speed: speed || null,
-          bearing: null,
-          accuracy: accuracy || null
-        })
+        body: JSON.stringify(pingData)
       });
 
       if (response.ok) {
@@ -493,7 +523,7 @@ export default function TouristMapPage() {
         toast('📴 Location saved offline', { duration: 2000 });
       }
     }
-  }, [isTracking, touristId, isOnline]);
+  }, [isOnline, zones, locationHistory]); // Removed isTracking and touristId - using refs instead
 
   const startLocationTracking = () => {
     console.log('🎯 START TRACKING BUTTON CLICKED!');
