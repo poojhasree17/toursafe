@@ -65,7 +65,31 @@ export async function sendFCMNotification(
     return false;
   }
 
+  // Validate token format (FCM tokens are typically 152+ characters)
+  if (!token || token.length < 140 || !token.includes(':')) {
+    console.warn('Invalid FCM token format, skipping notification:', {
+      tokenLength: token?.length || 0,
+      tokenPreview: token?.substring(0, 20) + '...'
+    });
+    return false;
+  }
+
   try {
+    // Convert all data values to strings (FCM requirement)
+    const stringifiedData: Record<string, string> = {};
+    if (payload.data) {
+      for (const [key, value] of Object.entries(payload.data)) {
+        // Convert all values to strings
+        if (value === null || value === undefined) {
+          stringifiedData[key] = '';
+        } else if (typeof value === 'object') {
+          stringifiedData[key] = JSON.stringify(value);
+        } else {
+          stringifiedData[key] = String(value);
+        }
+      }
+    }
+
     const message = {
       token: token,
       notification: {
@@ -84,14 +108,26 @@ export async function sendFCMNotification(
           Urgency: 'high',
         },
       },
-      data: payload.data || {},
+      data: stringifiedData,
     };
 
     const response = await messaging.send(message);
-    console.log('FCM notification sent successfully:', response);
+    console.log('✅ FCM notification sent successfully:', response);
     return true;
-  } catch (error) {
-    console.error('Error sending FCM notification:', error);
+  } catch (error: any) {
+    // Handle common FCM errors gracefully
+    if (error?.errorInfo?.code === 'messaging/invalid-argument' || 
+        error?.errorInfo?.code === 'messaging/registration-token-not-registered' ||
+        error?.errorInfo?.code === 'messaging/invalid-registration-token') {
+      console.warn('⚠️  Invalid or expired FCM token, skipping notification:', {
+        code: error?.errorInfo?.code,
+        token: token?.substring(0, 20) + '...'
+      });
+      // Don't throw - this is expected in dev/demo mode
+      return false;
+    }
+    
+    console.error('❌ Error sending FCM notification:', error?.errorInfo || error);
     return false;
   }
 }
@@ -108,19 +144,31 @@ export async function sendNotificationToTourist(
       .eq('tourist_id', touristId)
       .eq('platform', 'web');
 
-    if (error || !tokens || tokens.length === 0) {
-      console.error('No device tokens found for tourist:', touristId);
+    if (error) {
+      console.error('❌ Database error fetching device tokens:', error);
       return false;
     }
+
+    if (!tokens || tokens.length === 0) {
+      console.log('ℹ️  No device tokens found for tourist:', touristId, '(notifications disabled in demo mode)');
+      return false;
+    }
+
+    console.log(`📱 Sending notification to ${tokens.length} device(s) for tourist ${touristId}`);
+    console.log(`   Title: ${payload.title}`);
+    console.log(`   Body: ${payload.body}`);
 
     // Send to all devices
     const results = await Promise.all(
       tokens.map(token => sendFCMNotification(token.token, payload))
     );
 
+    const successCount = results.filter(r => r).length;
+    console.log(`📊 Notification result: ${successCount}/${tokens.length} sent successfully`);
+
     return results.some(result => result); // Return true if at least one succeeded
   } catch (error) {
-    console.error('Error sending notification to tourist:', error);
+    console.error('❌ Error sending notification to tourist:', error);
     return false;
   }
 }
@@ -131,22 +179,34 @@ export async function sendNotificationToOperators(payload: NotificationPayload):
     const { data: tokens, error } = await supabaseAdmin
       .from('device_tokens')
       .select('token')
-      .neq('user_id', null) // Only operators (not tourists)
+      .not('user_id', 'is', null) // Only operators (not tourists) - proper NULL check
       .eq('platform', 'web');
 
-    if (error || !tokens || tokens.length === 0) {
-      console.error('No operator device tokens found');
+    if (error) {
+      console.error('❌ Database error fetching operator tokens:', error);
       return false;
     }
+
+    if (!tokens || tokens.length === 0) {
+      console.log('ℹ️  No operator device tokens found (notifications disabled in demo mode)');
+      return false;
+    }
+
+    console.log(`📱 Sending notification to ${tokens.length} operator(s)`);
+    console.log(`   Title: ${payload.title}`);
+    console.log(`   Body: ${payload.body}`);
 
     // Send to all operators
     const results = await Promise.all(
       tokens.map(token => sendFCMNotification(token.token, payload))
     );
 
+    const successCount = results.filter(r => r).length;
+    console.log(`📊 Notification result: ${successCount}/${tokens.length} sent successfully`);
+
     return results.some(result => result); // Return true if at least one succeeded
   } catch (error) {
-    console.error('Error sending notification to operators:', error);
+    console.error('❌ Error sending notification to operators:', error);
     return false;
   }
 }
