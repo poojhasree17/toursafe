@@ -80,6 +80,8 @@ export default function TouristMapPage() {
   const [currentSpeed, setCurrentSpeed] = useState<number>(0);
   const [batteryLevel, setBatteryLevel] = useState<number>(100);
   const [safetyScore, setSafetyScore] = useState<any>(null);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
+  const [showTrackingPanel, setShowTrackingPanel] = useState<boolean>(false);
 
   const mapRef = useRef<HTMLDivElement>(null);
   const statsIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -183,13 +185,14 @@ export default function TouristMapPage() {
     initializeNotifications();
   }, []);
 
-  // Auto-start location tracking when tourist ID becomes available
-  useEffect(() => {
-    if (touristId && !isTracking && !locationWatchId) {
-      console.log('🚀 Auto-starting location tracking...');
-      startLocationTracking();
-    }
-  }, [touristId, isTracking, locationWatchId]);
+  // Manual tracking control - removed auto-start for user control
+  // Users now need to click "Start Tracking" button manually
+  // useEffect(() => {
+  //   if (touristId && !isTracking && !locationWatchId) {
+  //     console.log('🚀 Auto-starting location tracking...');
+  //     startLocationTracking();
+  //   }
+  // }, [touristId, isTracking, locationWatchId]);
 
   // Set up FCM message listener
   useEffect(() => {
@@ -235,11 +238,22 @@ export default function TouristMapPage() {
         // No VC found - use demo mode immediately
         console.log('📱 No VC found in localStorage, using demo mode');
         setTouristId('33333333-3333-3333-3333-333333333333');
-        setIsTracking(true);
-        toast('🎭 Demo Mode: Using Alice Tourist profile', {
-          duration: 4000,
+        setShowOnboarding(true);
+        toast.success('🎭 Demo Mode: Using Alice Tourist profile', {
+          duration: 3000,
           icon: '👤'
         });
+        
+        // Show onboarding after a short delay
+        setTimeout(() => {
+          if (!localStorage.getItem('toursafe_onboarding_seen')) {
+            toast('💡 Click "Start Tracking" in the GPS panel to begin monitoring your safety', {
+              duration: 5000,
+              icon: '👆'
+            });
+            localStorage.setItem('toursafe_onboarding_seen', 'true');
+          }
+        }, 2000);
         return;
       }
 
@@ -254,9 +268,8 @@ export default function TouristMapPage() {
         const result = await response.json();
         // For demo, we'll use one of the seeded tourist IDs
         setTouristId('33333333-3333-3333-3333-333333333333');
-        setIsTracking(true);
 
-        toast.success('✅ Credential verified - Tracking started', {
+        toast.success('✅ Credential verified. Click "Start Tracking" to begin.', {
           duration: 3000
         });
 
@@ -282,8 +295,7 @@ export default function TouristMapPage() {
       console.warn('ℹ️ VC verification failed, falling back to demo mode:', error);
       // Fallback to demo mode
       setTouristId('33333333-3333-3333-3333-333333333333');
-      setIsTracking(true);
-      toast('🎭 Demo Mode: Using Alice Tourist profile', {
+      toast('🎭 Demo Mode: Using Alice Tourist profile. Click "Start Tracking" to begin.', {
         duration: 4000,
         icon: '👤'
       });
@@ -325,6 +337,14 @@ export default function TouristMapPage() {
   }, [zones, userLocation, safetyScore]);
 
   const handleLocationUpdate = useCallback(async (lat: number, lng: number, accuracy?: number, speed?: number) => {
+    console.log('📍 Location Update:', {
+      lat: lat.toFixed(6),
+      lng: lng.toFixed(6),
+      accuracy: accuracy ? `±${accuracy.toFixed(0)}m` : 'N/A',
+      speed: speed ? `${(speed * 3.6).toFixed(1)} km/h` : 'N/A',
+      timestamp: new Date().toLocaleTimeString()
+    });
+
     const locationData: LocationHistory = {
       lat,
       lng,
@@ -334,7 +354,11 @@ export default function TouristMapPage() {
     };
 
     setUserLocation([lng, lat]);
-    setLocationHistory(prev => [...prev.slice(-49), locationData]); // Keep last 50 locations
+    setLocationHistory(prev => {
+      const updated = [...prev.slice(-49), locationData];
+      console.log(`📊 Location history: ${updated.length} points logged`);
+      return updated;
+    });
     setLocationAccuracy(accuracy || 0);
     setCurrentSpeed(speed || 0);
 
@@ -363,9 +387,18 @@ export default function TouristMapPage() {
       }));
     }
 
-    if (!isTracking || !touristId) return;
+    if (!isTracking || !touristId) {
+      console.log('⏸️ Skipping ping - tracking inactive or no tourist ID');
+      return;
+    }
 
     try {
+      console.log('📡 Sending location ping to server...', {
+        tourist_id: touristId,
+        lat: lat.toFixed(6),
+        lng: lng.toFixed(6)
+      });
+
       const response = await fetch('/api/v1/ping', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -381,6 +414,7 @@ export default function TouristMapPage() {
 
       if (response.ok) {
         const result = await response.json();
+        console.log('✅ Ping successful:', result);
 
         // Update trip stats for safe zones visited
         if (result.zonesHit && result.zonesHit.length > 0) {
@@ -396,8 +430,11 @@ export default function TouristMapPage() {
 
         // Handle zone warnings with enhanced notifications
         if (result.zonesHit && result.zonesHit.length > 0) {
+          console.log(`⚠️ Entered ${result.zonesHit.length} zone(s):`, result.zonesHit.map((z: any) => `${z.name} (${z.type})`));
+          
           result.zonesHit.forEach((zone: any) => {
             if (zone.type === 'RESTRICTED') {
+              console.error(`🚫 RESTRICTED ZONE: ${zone.name}`);
               toast.error(`🚫 RESTRICTED ZONE: ${zone.name}\n\n${zone.description || 'This area is restricted for safety reasons.'}\n\nLeave immediately and contact authorities if needed.`, {
                 duration: 8000,
                 className: 'toast-danger',
@@ -409,6 +446,7 @@ export default function TouristMapPage() {
                 safetyScore: Math.max(0, prev.safetyScore - 15)
               }));
             } else if (zone.type === 'ALERT') {
+              console.warn(`⚠️ ALERT ZONE: ${zone.name}`);
               toast(`⚠️ CAUTION: ${zone.name}\n\n${zone.description || 'Exercise caution in this area.'}\n\nRisk Level: ${zone.riskLevel || 'MEDIUM'}`, {
                 duration: 6000,
                 className: 'toast-warning',
@@ -420,6 +458,7 @@ export default function TouristMapPage() {
                 safetyScore: Math.max(0, prev.safetyScore - 8)
               }));
             } else if (zone.type === 'SAFE') {
+              console.log(`✅ SAFE ZONE: ${zone.name}`);
               toast.success(`✅ Safe Zone: ${zone.name}\n\n${zone.description || 'You are in a monitored safe area.'}`, {
                 duration: 3000,
                 className: 'toast-success',
@@ -457,39 +496,80 @@ export default function TouristMapPage() {
   }, [isTracking, touristId, isOnline]);
 
   const startLocationTracking = () => {
+    console.log('🎯 START TRACKING BUTTON CLICKED!');
+    console.log('Current state:', { isTracking, locationWatchId, touristId });
+    
     if (!navigator.geolocation) {
+      console.error('❌ Geolocation not supported');
       toast.error('Geolocation is not supported by this browser');
       return;
     }
 
+    // Stop tracking if already active
     if (locationWatchId) {
+      console.log('⏹️ Stopping location tracking...');
       navigator.geolocation.clearWatch(locationWatchId);
       setLocationWatchId(null);
       setIsTracking(false);
-      toast.success('Location tracking stopped');
+      toast.success('📍 GPS Tracking Stopped', {
+        duration: 3000,
+        icon: '⏹️'
+      });
       return;
     }
 
+    // Start tracking
+    console.log('▶️ Starting location tracking...');
+    toast.loading('📡 Acquiring GPS signal...', { id: 'gps-start' });
+
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
+        console.log('📍 GPS Position received:', {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          speed: position.coords.speed
+        });
+        
         const { latitude, longitude, accuracy, speed } = position.coords;
         handleLocationUpdate(latitude, longitude, accuracy, speed || undefined);
       },
       (error) => {
-        console.error('Location tracking error:', error);
-        toast.error(`Location tracking failed: ${error.message}`);
+        console.error('❌ Location tracking error:', error);
+        let errorMsg = 'Location tracking failed';
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMsg = 'Location access denied. Please enable location permissions.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMsg = 'Location information unavailable. Please check your GPS.';
+            break;
+          case error.TIMEOUT:
+            errorMsg = 'Location request timed out. Please try again.';
+            break;
+        }
+        
+        toast.error(errorMsg, { id: 'gps-start', duration: 5000 });
         setIsTracking(false);
+        setLocationWatchId(null);
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 10000 // 10 seconds for more frequent updates
+        timeout: 30000, // 30 seconds - give GPS more time to get accurate fix
+        maximumAge: 0 // Don't use cached position - always get fresh GPS fix
       }
     );
 
+    console.log('✅ GPS Watch started, watchId:', watchId);
     setLocationWatchId(watchId);
     setIsTracking(true);
-    toast.success('Location tracking started');
+    
+    toast.success('🎯 GPS Tracking Active!', {
+      id: 'gps-start',
+      duration: 3000,
+      icon: '📡'
+    });
   };
 
   const toggleFullscreen = () => {
@@ -709,20 +789,29 @@ export default function TouristMapPage() {
                 {notificationsEnabled ? <Bell className="h-3 w-3" /> : <BellOff className="h-3 w-3" />}
                 <span className="font-medium">{notificationsEnabled ? 'Alerts' : 'Silent'}</span>
               </div>
-
-              {/* Tracking Status */}
-              <div className={`flex items-center space-x-1 text-xs px-2 py-1.5 rounded-full transition-all duration-200 ${
-                isTracking ? 'bg-blue-100 text-blue-700 shadow-sm animate-pulse' : 'bg-gray-100 text-gray-700'
-              }`}>
-                <div className={`h-2 w-2 rounded-full ${isTracking ? 'bg-blue-500' : 'bg-gray-500'}`}></div>
-                <span className="font-medium">{isTracking ? 'Live' : 'Paused'}</span>
-                {!isTracking && (
-                  <span className="text-xs text-gray-500 ml-1" title="Location tracking is recommended for SOS alerts">
-                    (SOS needs location)
-                  </span>
-                )}
-              </div>
             </div>
+
+            {/* Tracking Control Button - PROMINENT */}
+            <Button
+              onClick={startLocationTracking}
+              className={`${
+                isTracking 
+                  ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg ring-2 ring-green-300' 
+                  : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg ring-2 ring-blue-300 animate-pulse'
+              } text-white font-bold px-5 py-2.5 transition-all duration-200 transform hover:scale-105`}
+            >
+              {isTracking ? (
+                <>
+                  <Radio className="h-5 w-5 mr-2 animate-pulse" />
+                  <span>Tracking Live</span>
+                </>
+              ) : (
+                <>
+                  <Navigation className="h-5 w-5 mr-2" />
+                  <span>Start Tracking</span>
+                </>
+              )}
+            </Button>
 
             {/* Action Buttons */}
             <div className="flex items-center space-x-1">
@@ -766,28 +855,214 @@ export default function TouristMapPage() {
           onMapStyleChange={handleMapStyleChange}
         />
 
-        {/* Debug info - remove in production */}
-        <div className="absolute top-20 right-4 bg-white/90 p-2 rounded text-xs z-40">
-          <div>Zones: {zones.length}</div>
-          <div>Location: {userLocation ? `${userLocation[0].toFixed(4)}, ${userLocation[1].toFixed(4)}` : 'None'}</div>
-          <div>Tracking: {isTracking ? 'ON' : 'OFF'}</div>
-          <div>TouristId: {touristId || 'None'}</div>
-          <div>SOS Confirm: {showSOSConfirm ? 'ON' : 'OFF'}</div>
+        {/* Compact Floating Control Buttons - Top Left */}
+        <div className="absolute top-4 left-4 z-[1000] flex flex-col space-y-2 pointer-events-auto">
+          {/* Quick Tracking Toggle Button */}
+          <Button
+            onClick={startLocationTracking}
+            className={`pointer-events-auto ${
+              isTracking 
+                ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-xl ring-2 ring-green-300' 
+                : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-xl ring-2 ring-blue-300 animate-pulse'
+            } text-white font-bold px-4 py-3 transition-all duration-200 transform hover:scale-105 flex items-center space-x-2`}
+          >
+            {isTracking ? (
+              <>
+                <Radio className="h-5 w-5 animate-pulse" />
+                <span>Tracking</span>
+                <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs">LIVE</span>
+              </>
+            ) : (
+              <>
+                <Navigation className="h-5 w-5" />
+                <span>Start GPS</span>
+              </>
+            )}
+          </Button>
+
+          {/* Compact Info Panel - Only when tracking */}
+          {isTracking && (
+            <div className="bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-white/20 p-3 space-y-2 pointer-events-auto">
+              {/* Tracking Stats */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {locationHistory.length > 0 && (
+                  <div className="flex items-center space-x-1 bg-blue-50 rounded px-2 py-1">
+                    <MapPin className="h-3 w-3 text-blue-600" />
+                    <span className="font-bold text-blue-900">{locationHistory.length}</span>
+                    <span className="text-blue-600">pts</span>
+                  </div>
+                )}
+                {locationAccuracy > 0 && (
+                  <div className={`flex items-center space-x-1 rounded px-2 py-1 ${
+                    locationAccuracy < 50 ? 'bg-green-50' : 
+                    locationAccuracy < 100 ? 'bg-yellow-50' : 'bg-red-50'
+                  }`}>
+                    <Crosshair className={`h-3 w-3 ${
+                      locationAccuracy < 50 ? 'text-green-600' : 
+                      locationAccuracy < 100 ? 'text-yellow-600' : 'text-red-600'
+                    }`} />
+                    <span className={`font-bold ${
+                      locationAccuracy < 50 ? 'text-green-900' : 
+                      locationAccuracy < 100 ? 'text-yellow-900' : 'text-red-900'
+                    }`}>
+                      ±{locationAccuracy > 1000 ? `${(locationAccuracy/1000).toFixed(1)}km` : `${Math.round(locationAccuracy)}m`}
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              {/* GPS Accuracy Warning */}
+              {locationAccuracy > 100 && (
+                <div className="flex items-start space-x-2 bg-orange-50 rounded-lg border border-orange-200 p-2">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0 text-orange-600 mt-0.5" />
+                  <div className="text-xs text-orange-800">
+                    <div className="font-semibold">Poor GPS Signal</div>
+                    <div className="text-xs">
+                      {locationAccuracy > 10000 
+                        ? 'Using network location. Move outdoors for GPS.' 
+                        : 'Accuracy improving...'}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {currentSpeed > 0 && (
+                <div className="flex items-center space-x-2 bg-purple-50 rounded px-2 py-1">
+                  <Activity className="h-3 w-3 text-purple-600" />
+                  <span className="text-xs font-bold text-purple-900">{Math.round(currentSpeed * 3.6)} km/h</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Expandable Details Button */}
+          <Button
+            onClick={() => setShowTrackingPanel(!showTrackingPanel)}
+            variant="outline"
+            className="bg-white/95 backdrop-blur-md hover:bg-white shadow-lg border-white/20 p-2 pointer-events-auto"
+            size="icon"
+          >
+            {showTrackingPanel ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </Button>
         </div>
 
-
-        {/* Location Accuracy Indicator */}
-        {locationAccuracy > 0 && (
-          <div className="absolute top-4 right-4 z-10">
-            <div className="bg-white/90 backdrop-blur-md rounded-lg px-3 py-2 shadow-lg border border-white/20">
-              <div className="flex items-center space-x-2 text-sm">
-                <Crosshair className="h-4 w-4 text-blue-600" />
-                <div>
-                  <div className="font-medium">±{Math.round(locationAccuracy)}m</div>
-                  <div className="text-xs text-gray-600">Accuracy</div>
+        {/* Expandable Detailed Panel */}
+        {showTrackingPanel && (
+          <div className="absolute top-4 left-[180px] z-[1000] transition-all duration-300 pointer-events-auto">
+            <Card className="bg-white/95 backdrop-blur-md shadow-2xl border-0 w-72 pointer-events-auto">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center space-x-2">
+                    <Navigation className="h-4 w-4 text-blue-600" />
+                    <span>GPS Details</span>
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowTrackingPanel(false)}
+                    className="h-6 w-6"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </Button>
                 </div>
-              </div>
-            </div>
+              </CardHeader>
+              <CardContent className="space-y-2 text-xs">
+                {/* Status */}
+                <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                  <span className="text-gray-600">Status:</span>
+                  <span className={`font-bold ${isTracking ? 'text-green-600' : 'text-gray-500'}`}>
+                    {isTracking ? '● LIVE' : '○ OFF'}
+                  </span>
+                </div>
+
+                {/* Location History */}
+                {locationHistory.length > 0 && (
+                  <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
+                    <span className="text-blue-700">Points Logged:</span>
+                    <span className="font-bold text-blue-900">{locationHistory.length}</span>
+                  </div>
+                )}
+
+                {/* GPS Accuracy */}
+                {locationAccuracy > 0 && (
+                  <div className={`flex items-center justify-between p-2 rounded ${
+                    locationAccuracy < 50 ? 'bg-green-50' : 
+                    locationAccuracy < 100 ? 'bg-yellow-50' : 'bg-red-50'
+                  }`}>
+                    <span className={`${
+                      locationAccuracy < 50 ? 'text-green-700' : 
+                      locationAccuracy < 100 ? 'text-yellow-700' : 'text-red-700'
+                    }`}>Accuracy:</span>
+                    <span className={`font-bold ${
+                      locationAccuracy < 50 ? 'text-green-600' : 
+                      locationAccuracy < 100 ? 'text-yellow-600' : 'text-red-600'
+                    }`}>
+                      ±{locationAccuracy > 1000 ? `${(locationAccuracy/1000).toFixed(1)}km` : `${Math.round(locationAccuracy)}m`}
+                    </span>
+                  </div>
+                )}
+
+                {/* GPS Warning in Detailed Panel */}
+                {locationAccuracy > 100 && (
+                  <div className="flex items-start space-x-2 p-2 bg-orange-50 rounded border border-orange-200">
+                    <AlertTriangle className="h-4 w-4 flex-shrink-0 text-orange-600 mt-0.5" />
+                    <div className="text-orange-800">
+                      <div className="font-bold text-xs">Poor GPS Accuracy</div>
+                      <div className="text-xs mt-1">
+                        {locationAccuracy > 10000 ? (
+                          <>Using network/IP location. For better accuracy:</>
+                        ) : (
+                          <>Waiting for better GPS signal...</>
+                        )}
+                      </div>
+                      {locationAccuracy > 10000 && (
+                        <ul className="text-xs mt-1 ml-3 space-y-0.5">
+                          <li>• Move outdoors</li>
+                          <li>• Enable device GPS</li>
+                          <li>• Allow precise location</li>
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Current Speed */}
+                {currentSpeed > 0 && (
+                  <div className="flex items-center justify-between p-2 bg-purple-50 rounded">
+                    <span className="text-purple-700">Speed:</span>
+                    <span className="font-bold text-purple-900">
+                      {Math.round(currentSpeed * 3.6)} km/h
+                    </span>
+                  </div>
+                )}
+
+                {/* Features */}
+                <div className="pt-2 border-t space-y-1">
+                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <span className="text-gray-600">Connection:</span>
+                    <span className={`font-bold ${isOnline ? 'text-green-600' : 'text-red-600'}`}>
+                      {isOnline ? 'Online' : 'Offline'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <span className="text-gray-600">Alerts:</span>
+                    <span className={`font-bold ${notificationsEnabled ? 'text-purple-600' : 'text-gray-500'}`}>
+                      {notificationsEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Info */}
+                {!isTracking && (
+                  <div className="flex items-start space-x-2 p-2 bg-blue-50 rounded border border-blue-200">
+                    <Info className="h-4 w-4 flex-shrink-0 text-blue-600 mt-0.5" />
+                    <p className="text-blue-800">
+                      Enable GPS to receive real-time safety alerts.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
@@ -857,107 +1132,93 @@ export default function TouristMapPage() {
         </div>
       )}
 
-      {/* Enhanced Bottom Panel */}
-      <div className="bg-white/95 backdrop-blur-md border-t border-white/20 p-4">
-        {/* Zone Statistics */}
-        <div className="grid grid-cols-4 gap-4 mb-4">
-          {[
-            { label: 'Safe Zones', count: zones.filter(z => z.type === 'SAFE').length, color: 'green', icon: CheckCircle },
-            { label: 'Alert Zones', count: zones.filter(z => z.type === 'ALERT').length, color: 'yellow', icon: AlertCircle },
-            { label: 'Restricted', count: zones.filter(z => z.type === 'RESTRICTED').length, color: 'red', icon: XCircle },
-            { label: 'Total Zones', count: zones.length, color: 'blue', icon: Layers }
-          ].map(({ label, count, color, icon: Icon }) => (
-            <div key={label} className="text-center">
-              <div className={`text-2xl font-bold text-${color}-600 mb-1`}>
-                {count}
+      {/* Ultra-Compact Bottom Bar */}
+      <div className="bg-white/95 backdrop-blur-md border-t border-white/20 px-4 py-2">
+        {/* Single Row Zone Statistics */}
+        <div className="flex items-center justify-between gap-4">
+          {/* Zone Counts */}
+          <div className="flex items-center gap-3">
+            {[
+              { label: 'Safe', count: zones.filter(z => z.type === 'SAFE').length, color: 'text-green-600', bgColor: 'bg-green-50', icon: CheckCircle },
+              { label: 'Alert', count: zones.filter(z => z.type === 'ALERT').length, color: 'text-yellow-600', bgColor: 'bg-yellow-50', icon: AlertCircle },
+              { label: 'Restricted', count: zones.filter(z => z.type === 'RESTRICTED').length, color: 'text-red-600', bgColor: 'bg-red-50', icon: XCircle },
+              { label: 'Total', count: zones.length, color: 'text-blue-600', bgColor: 'bg-blue-50', icon: Layers }
+            ].map(({ label, count, color, bgColor, icon: Icon }) => (
+              <div key={label} className={`${bgColor} rounded-lg px-3 py-1.5 flex items-center space-x-2`}>
+                <Icon className={`h-3.5 w-3.5 ${color}`} />
+                <div className={`text-base font-bold ${color}`}>{count}</div>
+                <span className={`text-xs ${color} font-medium`}>{label}</span>
               </div>
-              <div className={`text-xs text-${color}-600 font-medium flex items-center justify-center`}>
-                <Icon className="h-3 w-3 mr-1" />
-                {label}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Trip Statistics Toggle */}
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-gray-900">Trip Statistics</h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowStatsPanel(!showStatsPanel)}
-            className="text-gray-600 hover:text-gray-900"
-          >
-            {showStatsPanel ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
-        </div>
-
-        {showStatsPanel && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-3">
-              <div className="flex items-center space-x-2 mb-1">
-                <Route className="h-4 w-4 text-blue-600" />
-                <span className="text-xs font-medium text-blue-900">Distance</span>
-              </div>
-              <div className="text-lg font-bold text-blue-900">
-                {formatDistance(tripStats.distance)}
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-3">
-              <div className="flex items-center space-x-2 mb-1">
-                <Timer className="h-4 w-4 text-green-600" />
-                <span className="text-xs font-medium text-green-900">Duration</span>
-              </div>
-              <div className="text-lg font-bold text-green-900">
-                {formatDuration(tripStats.duration)}
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-3">
-              <div className="flex items-center space-x-2 mb-1">
-                <CheckCircle className="h-4 w-4 text-purple-600" />
-                <span className="text-xs font-medium text-purple-900">Safe Visits</span>
-              </div>
-              <div className="text-lg font-bold text-purple-900">
-                {tripStats.safeZonesVisited}
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-amber-50 to-amber-100 rounded-lg p-3">
-              <div className="flex items-center space-x-2 mb-1">
-                {getSafetyScoreIcon(tripStats.safetyScore)}
-                <span className={`text-xs font-medium ${getSafetyScoreColor(tripStats.safetyScore)}`}>
-                  Safety Score
-                </span>
-              </div>
-              <div className={`text-lg font-bold ${getSafetyScoreColor(tripStats.safetyScore)}`}>
-                {Math.round(tripStats.safetyScore)}%
-              </div>
-            </div>
+            ))}
           </div>
-        )}
 
-        {/* Safety Score Display */}
-        {safetyScore && (
-          <SafetyScoreDisplay safetyScore={safetyScore} className="mb-4" />
-        )}
-
-        {/* Current Location & Speed */}
-        {userLocation && (
-          <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-3">
-            <div className="flex items-center space-x-2">
-              <MapPin className="h-4 w-4 text-gray-600" />
-              <span className="text-gray-700">
-                {userLocation[1].toFixed(6)}, {userLocation[0].toFixed(6)}
-              </span>
-            </div>
-            {currentSpeed > 0 && (
-              <div className="flex items-center space-x-2">
-                <Activity className="h-4 w-4 text-blue-600" />
-                <span className="text-blue-700 font-medium">
-                  {Math.round(currentSpeed * 3.6)} km/h
+          {/* Current Location - Compact */}
+          {userLocation && isTracking && (
+            <div className="flex items-center space-x-3 text-xs bg-gray-50 rounded-lg px-3 py-1.5">
+              <div className="flex items-center space-x-1">
+                <MapPin className="h-3 w-3 text-gray-500" />
+                <span className="text-gray-600 font-mono">
+                  {userLocation[1].toFixed(4)}, {userLocation[0].toFixed(4)}
                 </span>
+              </div>
+              {currentSpeed > 0 && (
+                <div className="flex items-center space-x-1 border-l border-gray-300 pl-3">
+                  <Activity className="h-3 w-3 text-blue-600" />
+                  <span className="text-blue-700 font-semibold">
+                    {Math.round(currentSpeed * 3.6)} km/h
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Compact Safety Score & Stats - Single Row */}
+        {safetyScore && (
+          <div className="mt-2 flex items-center justify-between">
+            {/* Safety Score */}
+            <button
+              onClick={() => setShowStatsPanel(!showStatsPanel)}
+              className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg hover:from-amber-100 hover:to-orange-100 transition-colors"
+            >
+              <Shield className="h-4 w-4 text-amber-600" />
+              <span className="text-xs font-semibold text-gray-700">Safety:</span>
+              <span className={`text-base font-bold ${getSafetyScoreColor(safetyScore.score)}`}>
+                {Math.round(safetyScore.score)}%
+              </span>
+              {showStatsPanel ? <EyeOff className="h-3 w-3 text-gray-600" /> : <Eye className="h-3 w-3 text-gray-600" />}
+            </button>
+
+            {/* Trip Stats - Compact */}
+            {showStatsPanel && (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center space-x-1 bg-blue-50 rounded px-2 py-1">
+                  <Route className="h-3 w-3 text-blue-600" />
+                  <span className="text-xs font-bold text-blue-900">
+                    {formatDistance(tripStats.distance)}
+                  </span>
+                </div>
+
+                <div className="flex items-center space-x-1 bg-green-50 rounded px-2 py-1">
+                  <Timer className="h-3 w-3 text-green-600" />
+                  <span className="text-xs font-bold text-green-900">
+                    {formatDuration(tripStats.duration)}
+                  </span>
+                </div>
+
+                <div className="flex items-center space-x-1 bg-purple-50 rounded px-2 py-1">
+                  <CheckCircle className="h-3 w-3 text-purple-600" />
+                  <span className="text-xs font-bold text-purple-900">
+                    {tripStats.safeZonesVisited}
+                  </span>
+                </div>
+
+                <div className="flex items-center space-x-1 bg-orange-50 rounded px-2 py-1">
+                  <AlertTriangle className="h-3 w-3 text-orange-600" />
+                  <span className="text-xs font-bold text-orange-900">
+                    {tripStats.alertsReceived}
+                  </span>
+                </div>
               </div>
             )}
           </div>

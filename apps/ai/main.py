@@ -6,17 +6,21 @@ Analyzes GPS ping patterns to detect immobility, route deviation, and other anom
 import logging
 from datetime import datetime, timezone
 from typing import List, Optional
+import time
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -32,6 +36,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all incoming requests and responses"""
+    start_time = time.time()
+    
+    # Log incoming request
+    logger.info(f"🌐 Incoming {request.method} request to {request.url.path}")
+    if request.client:
+        logger.info(f"   Client: {request.client.host}:{request.client.port}")
+    
+    # Process request
+    response = await call_next(request)
+    
+    # Log response
+    duration = time.time() - start_time
+    logger.info(f"✓ Response: {response.status_code} | Duration: {duration:.3f}s")
+    
+    return response
 
 # Pydantic models
 class PingData(BaseModel):
@@ -91,8 +115,31 @@ def initialize_anomaly_detector():
     
     logger.info("Anomaly detector initialized with baseline data")
 
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    """Log startup information"""
+    logger.info("=" * 80)
+    logger.info("🚀 TourSafe AI Service Starting Up")
+    logger.info("=" * 80)
+    logger.info(f"   Service: TourSafe AI Microservice v1.0.0")
+    logger.info(f"   Purpose: Tourist Anomaly Detection")
+    logger.info(f"   Model: IsolationForest with contamination=0.1")
+    logger.info(f"   Features: speed, bearing_change, step_distance, acceleration")
+    logger.info(f"   Timestamp: {datetime.now(timezone.utc).isoformat()}")
+    logger.info("=" * 80)
+
 # Initialize on startup
 initialize_anomaly_detector()
+logger.info("✅ Service initialization complete - Ready to accept requests")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Log shutdown information"""
+    logger.info("=" * 80)
+    logger.info("🛑 TourSafe AI Service Shutting Down")
+    logger.info(f"   Timestamp: {datetime.now(timezone.utc).isoformat()}")
+    logger.info("=" * 80)
 
 def calculate_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """Calculate distance between two GPS points in meters using Haversine formula"""
@@ -124,7 +171,10 @@ def calculate_bearing(lat1: float, lng1: float, lat2: float, lng2: float) -> flo
 
 def analyze_pings_rules(pings: List[PingData]) -> tuple[str, float, str]:
     """Rule-based analysis for specific patterns"""
+    logger.debug(f"   analyze_pings_rules: Processing {len(pings)} pings")
+    
     if len(pings) < 3:
+        logger.debug("   analyze_pings_rules: Insufficient data (< 3 pings)")
         return "OK", 0.0, "Insufficient data for analysis"
     
     # Convert to DataFrame for easier analysis
@@ -161,9 +211,12 @@ def analyze_pings_rules(pings: List[PingData]) -> tuple[str, float, str]:
     lng_range = df['lng'].max() - df['lng'].min()
     spatial_radius = np.sqrt(lat_range**2 + lng_range**2) * 111000  # Rough conversion to meters
     
+    logger.debug(f"   Immobility check: median_speed={median_speed:.2f} m/s, radius={spatial_radius:.1f}m, time={time_span_minutes:.1f} min")
+    
     if (median_speed < 0.5 and  # Very low speed
         spatial_radius < 15 and  # Small area
         time_span_minutes >= 6):  # Extended period
+        logger.info(f"   ⚠️  IMMOBILITY DETECTED: stationary for {time_span_minutes:.1f} min")
         return "IMMOBILE", 0.8, f"Tourist stationary for {time_span_minutes:.1f} minutes (median speed: {median_speed:.2f} m/s, radius: {spatial_radius:.1f}m)"
     
     # Rule 2: Check for unusual route deviation
@@ -190,20 +243,28 @@ def analyze_pings_rules(pings: List[PingData]) -> tuple[str, float, str]:
             bearing_variance = np.var(bearing_changes)
             mean_bearing_change = np.mean(bearing_changes)
             
+            logger.debug(f"   Deviation check: bearing_variance={bearing_variance:.1f}, mean_change={mean_bearing_change:.1f}°")
+            
             # Check for erratic movement patterns
             if (bearing_variance > 5000 and  # High variance in direction
                 mean_bearing_change > 60):     # Large average direction changes
+                logger.info(f"   ⚠️  DEVIATION DETECTED: erratic movement pattern")
                 return "DEVIATION", 0.7, f"Erratic movement detected (bearing variance: {bearing_variance:.1f}, avg change: {mean_bearing_change:.1f}°)"
     
+    logger.debug("   No anomalies detected by rule-based analysis")
     return "OK", 0.1, "Normal movement pattern detected"
 
 def analyze_pings_ml(pings: List[PingData]) -> tuple[str, float, str]:
     """ML-based anomaly detection"""
+    logger.debug(f"   analyze_pings_ml: Processing {len(pings)} pings")
+    
     if len(pings) < 5:
+        logger.debug("   analyze_pings_ml: Insufficient data (< 5 pings)")
         return "OK", 0.0, "Insufficient data for ML analysis"
     
     try:
         # Extract features
+        logger.debug("   Extracting features for ML analysis...")
         features = []
         
         for i in range(1, len(pings)):
@@ -245,10 +306,12 @@ def analyze_pings_ml(pings: List[PingData]) -> tuple[str, float, str]:
             features.append([speed, bearing_change, distance, abs(acceleration)])
         
         if len(features) < 2:
+            logger.debug("   analyze_pings_ml: Insufficient features (< 2)")
             return "OK", 0.0, "Insufficient features for ML analysis"
         
         # Scale features and predict
         features_array = np.array(features)
+        logger.debug(f"   Extracted {len(features)} feature vectors")
         features_scaled = scaler.transform(features_array)
         
         # Get anomaly scores
@@ -263,18 +326,23 @@ def analyze_pings_ml(pings: List[PingData]) -> tuple[str, float, str]:
         # Convert to 0-1 scale (lower decision function values indicate higher anomaly)
         normalized_score = max(0.0, min(1.0, (0.5 - avg_anomaly_score) * 2))
         
+        logger.debug(f"   ML scores: avg={avg_anomaly_score:.3f}, normalized={normalized_score:.3f}, anomaly_ratio={anomaly_ratio:.1%}")
+        
         if anomaly_ratio > 0.3:  # If >30% of points are anomalous
+            logger.info(f"   ⚠️  ML ANOMALY DETECTED: {anomaly_ratio:.1%} anomalous points")
             return "DEVIATION", normalized_score, f"ML detected anomalous movement pattern ({anomaly_ratio:.1%} anomalous points)"
         
+        logger.debug("   ML analysis: movement appears normal")
         return "OK", normalized_score, "ML analysis indicates normal movement"
         
     except Exception as e:
-        logger.warning(f"ML analysis failed: {e}")
+        logger.warning(f"   ML analysis failed: {e}", exc_info=True)
         return "OK", 0.0, "ML analysis unavailable"
 
 @app.get("/", response_model=HealthResponse)
 async def root():
     """Root endpoint for health check"""
+    logger.info("Root endpoint accessed - health check")
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now(timezone.utc).isoformat()
@@ -283,6 +351,7 @@ async def root():
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
+    logger.info("Health check endpoint accessed")
     return HealthResponse(
         status="healthy", 
         timestamp=datetime.now(timezone.utc).isoformat()
@@ -292,13 +361,34 @@ async def health_check():
 async def score_pings(request: ScoreRequest):
     """Analyze GPS pings for anomalies"""
     try:
-        logger.info(f"Analyzing {len(request.pings)} pings")
+        logger.info("=" * 80)
+        logger.info(f"📍 NEW ANALYSIS REQUEST - Received {len(request.pings)} GPS pings")
+        
+        # Log first and last ping details
+        if len(request.pings) > 0:
+            first_ping = request.pings[0]
+            last_ping = request.pings[-1]
+            logger.info(f"   First ping: {first_ping.ts} @ ({first_ping.lat:.6f}, {first_ping.lng:.6f})")
+            logger.info(f"   Last ping:  {last_ping.ts} @ ({last_ping.lat:.6f}, {last_ping.lng:.6f})")
+            
+            # Calculate time span
+            try:
+                first_time = datetime.fromisoformat(first_ping.ts.replace('Z', '+00:00'))
+                last_time = datetime.fromisoformat(last_ping.ts.replace('Z', '+00:00'))
+                time_span = (last_time - first_time).total_seconds() / 60
+                logger.info(f"   Time span: {time_span:.2f} minutes")
+            except Exception as e:
+                logger.warning(f"   Could not calculate time span: {e}")
         
         # Run rule-based analysis first
+        logger.info("🔍 Running rule-based analysis...")
         rule_verdict, rule_score, rule_reason = analyze_pings_rules(request.pings)
+        logger.info(f"   Rule-based result: {rule_verdict} (score: {rule_score:.3f})")
+        logger.info(f"   Reason: {rule_reason}")
         
         # If rules detect an anomaly, prioritize that
         if rule_verdict != "OK":
+            logger.info(f"⚠️  ANOMALY DETECTED by rules - returning {rule_verdict}")
             return ScoreResponse(
                 verdict=rule_verdict,
                 score=rule_score,
@@ -306,14 +396,22 @@ async def score_pings(request: ScoreRequest):
             )
         
         # Otherwise, run ML analysis
+        logger.info("🤖 Running ML-based analysis...")
         ml_verdict, ml_score, ml_reason = analyze_pings_ml(request.pings)
+        logger.info(f"   ML result: {ml_verdict} (score: {ml_score:.3f})")
+        logger.info(f"   Reason: {ml_reason}")
         
         # Combine results (rules take precedence)
         final_verdict = rule_verdict if rule_verdict != "OK" else ml_verdict
         final_score = max(rule_score, ml_score)
         final_reason = rule_reason if rule_verdict != "OK" else ml_reason
         
-        logger.info(f"Analysis result: {final_verdict} (score: {final_score:.3f})")
+        if final_verdict != "OK":
+            logger.info(f"⚠️  FINAL RESULT: {final_verdict} - Anomaly Score: {final_score:.3f}")
+        else:
+            logger.info(f"✅ FINAL RESULT: {final_verdict} - Normal movement (score: {final_score:.3f})")
+        logger.info(f"   {final_reason}")
+        logger.info("=" * 80)
         
         return ScoreResponse(
             verdict=final_verdict,
@@ -322,12 +420,13 @@ async def score_pings(request: ScoreRequest):
         )
         
     except Exception as e:
-        logger.error(f"Error analyzing pings: {e}")
+        logger.error(f"❌ ERROR analyzing pings: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 @app.get("/model-info")
 async def model_info():
     """Get information about the trained model"""
+    logger.info("Model info endpoint accessed")
     return {
         "model_type": "IsolationForest",
         "contamination": 0.1,

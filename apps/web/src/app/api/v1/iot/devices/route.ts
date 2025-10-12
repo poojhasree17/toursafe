@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabaseAdmin } from '../../../../lib/supabase';
 
 interface DeviceRegistrationRequest {
   touristId: string;
@@ -38,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify tourist exists
-    const { data: tourist, error: touristError } = await supabase
+    const { data: tourist, error: touristError } = await supabaseAdmin
       .from('tourists')
       .select('id, display_name')
       .eq('id', touristId)
@@ -52,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if device already exists
-    const { data: existingDevice } = await supabase
+    const { data: existingDevice } = await supabaseAdmin
       .from('iot_devices')
       .select('id, status')
       .eq('device_id', deviceId)
@@ -61,7 +56,7 @@ export async function POST(request: NextRequest) {
     if (existingDevice) {
       // Update existing device if it's inactive/decommissioned
       if (existingDevice.status === 'DECOMMISSIONED' || existingDevice.status === 'INACTIVE') {
-        const { data: updatedDevice, error: updateError } = await supabase
+        const { data: updatedDevice, error: updateError } = await supabaseAdmin
           .from('iot_devices')
           .update({
             tourist_id: touristId,
@@ -100,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Register new device
-    const { data: device, error: deviceError } = await supabase
+    const { data: device, error: deviceError } = await supabaseAdmin
       .from('iot_devices')
       .insert({
         tourist_id: touristId,
@@ -153,7 +148,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: devices, error } = await supabase
+    const { data: devices, error } = await supabaseAdmin
       .from('iot_devices')
       .select('*')
       .eq('tourist_id', touristId)
@@ -202,7 +197,7 @@ export async function PATCH(request: NextRequest) {
     // Update last seen when device reports in
     updateData.last_seen = new Date().toISOString();
 
-    const { data: device, error } = await supabase
+    const { data: device, error } = await supabaseAdmin
       .from('iot_devices')
       .update(updateData)
       .eq('device_id', deviceId)

@@ -64,10 +64,25 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  // Set up real-time incident updates
+  // Set up real-time incident updates or polling
   useEffect(() => {
     if (!user) return;
 
+    // Check if Supabase URL is properly configured
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const isSupabaseConfigured = supabaseUrl && supabaseUrl !== 'https://demo.supabase.co';
+
+    if (!isSupabaseConfigured) {
+      // Use polling when Supabase is not configured
+      const pollInterval = setInterval(() => {
+        loadDashboardData();
+      }, 30000); // Poll every 30 seconds
+
+      return () => clearInterval(pollInterval);
+    }
+
+    // Try to set up realtime subscription
+    let hasLoggedError = false;
     const channel = supabase
       .channel('incidents')
       .on(
@@ -79,14 +94,15 @@ export default function AdminDashboard() {
         },
         (payload) => {
           console.log('Real-time incident update:', payload);
-          loadDashboardData(); // Refresh dashboard data
+          loadDashboardData();
         }
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to incident updates');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.warn('Failed to subscribe to incident updates, will use manual refresh');
+          console.log('✓ Real-time updates active');
+        } else if (!hasLoggedError && (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED')) {
+          hasLoggedError = true;
+          console.log('ℹ Using polling mode for updates');
         }
       });
 
@@ -161,9 +177,9 @@ export default function AdminDashboard() {
         .limit(5);
 
       if (incidents && incidents.length > 0) {
-        setRecentIncidents(incidents.map(incident => ({
+        setRecentIncidents(incidents.map((incident: any) => ({
           ...incident,
-          tourist: incident.tourists as any,
+          tourist: incident.tourists,
           description: incident.meta?.description || `${incident.type} incident reported`
         })));
       } else {
@@ -223,8 +239,8 @@ export default function AdminDashboard() {
       setDashboardActionLoading(incidentId);
 
       // Update incident status to ACK in database
-      const { error } = await supabase
-        .from('incidents')
+      const { error } = await (supabase
+        .from('incidents') as any)
         .update({ status: 'ACK' })
         .eq('id', incidentId);
 
@@ -245,8 +261,8 @@ export default function AdminDashboard() {
       setDashboardActionLoading(incidentId);
 
       // Update incident status to CLOSED in database
-      const { error } = await supabase
-        .from('incidents')
+      const { error } = await (supabase
+        .from('incidents') as any)
         .update({ status: 'CLOSED' })
         .eq('id', incidentId);
 
@@ -267,15 +283,15 @@ export default function AdminDashboard() {
       setDashboardActionLoading(incidentId);
 
       // Update incident status to ASSIGNED in database
-      const { error } = await supabase
-        .from('incidents')
+      const { error } = await (supabase
+        .from('incidents') as any)
         .update({ status: 'ASSIGNED', updated_at: new Date().toISOString() })
         .eq('id', incidentId);
 
       if (error) throw error;
 
       toast.success('Incident assigned successfully');
-      loadIncidents(); // Refresh the list
+      loadDashboardData(); // Refresh the list
     } catch (error) {
       console.error('Error assigning incident:', error);
       toast.error('Failed to assign incident');

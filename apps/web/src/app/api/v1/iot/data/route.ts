@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabaseAdmin } from '../../../../lib/supabase';
 
 interface IoTDataPoint {
   deviceId: string;
@@ -38,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify device exists and is active
-    const { data: device, error: deviceError } = await supabase
+    const { data: device, error: deviceError } = await supabaseAdmin
       .from('iot_devices')
       .select('id, tourist_id, status, is_active')
       .eq('device_id', deviceId)
@@ -54,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert data point
-    const { data: dataPoint, error: dataError } = await supabase
+    const { data: dataPoint, error: dataError } = await supabaseAdmin
       .from('iot_data_points')
       .insert({
         device_id: device.id,
@@ -89,14 +84,14 @@ export async function POST(request: NextRequest) {
       updateData.battery_level = value;
     }
 
-    await supabase
+    await supabaseAdmin
       .from('iot_devices')
       .update(updateData)
       .eq('id', device.id);
 
     // If this is location data, also create a ping record for consistency
     if (dataType === 'LOCATION' && locationLat && locationLng) {
-      await supabase
+      await supabaseAdmin
         .from('pings')
         .insert({
           tourist_id: device.tourist_id,
@@ -192,7 +187,7 @@ async function checkAndGenerateAlerts(deviceId: string, dataPoint: any): Promise
   }
 
   if (alertType) {
-    const { error: alertError } = await supabase
+    const { error: alertError } = await supabaseAdmin
       .from('iot_alerts')
       .insert({
         device_id: deviceId,
@@ -206,7 +201,7 @@ async function checkAndGenerateAlerts(deviceId: string, dataPoint: any): Promise
       console.error('Error creating IoT alert:', alertError);
     } else {
       // Update data point to indicate alert was generated
-      await supabase
+      await supabaseAdmin
         .from('iot_data_points')
         .update({ alert_generated: true })
         .eq('id', dataPoint.id);
@@ -233,7 +228,7 @@ export async function GET(request: NextRequest) {
     }
 
     // First get device info to verify access
-    const { data: device, error: deviceError } = await supabase
+    const { data: device, error: deviceError } = await supabaseAdmin
       .from('iot_devices')
       .select('id, tourist_id, device_name')
       .eq('device_id', deviceId)
@@ -246,7 +241,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: dataPoints, error } = await supabase
+    const { data: dataPoints, error } = await supabaseAdmin
       .from('iot_data_points')
       .select('*')
       .eq('device_id', device.id)

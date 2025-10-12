@@ -355,22 +355,19 @@ export function TourSafeMap({
       {/* SOS Button - Conditionally visible for safety */}
       <SOSButton onSOSClick={onSOSClick} showSOS={showSOS} />
 
-      {/* Zone Legend */}
+      {/* Compact Zone Legend - Top Right */}
       {zones.length > 0 && (
-        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-md p-4 rounded-xl shadow-xl border border-white/20">
-          <h4 className="font-bold text-sm mb-3 text-gray-900">Safety Zones</h4>
-          <div className="space-y-2">
+        <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-3 py-2 rounded-lg shadow-lg border border-white/20">
+          <div className="flex items-center gap-3">
             {[
-              { type: 'SAFE', color: 'emerald', label: 'Safe Zone', count: zones.filter(z => z.type === 'SAFE').length },
-              { type: 'ALERT', color: 'amber', label: 'Alert Zone', count: zones.filter(z => z.type === 'ALERT').length },
-              { type: 'RESTRICTED', color: 'red', label: 'Restricted', count: zones.filter(z => z.type === 'RESTRICTED').length }
-            ].map(({ type, color, label, count }) => (
-              <div key={type} className="flex items-center justify-between gap-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className={`w-4 h-4 bg-${color}-500 rounded-md shadow-sm`}></div>
-                  <span className="font-medium text-gray-700">{label}</span>
-                </div>
-                <span className={`font-bold text-${color}-600`}>{count}</span>
+              { type: 'SAFE', color: 'bg-emerald-500', textColor: 'text-emerald-600', label: 'Safe', count: zones.filter(z => z.type === 'SAFE').length },
+              { type: 'ALERT', color: 'bg-amber-500', textColor: 'text-amber-600', label: 'Alert', count: zones.filter(z => z.type === 'ALERT').length },
+              { type: 'RESTRICTED', color: 'bg-red-500', textColor: 'text-red-600', label: 'Restricted', count: zones.filter(z => z.type === 'RESTRICTED').length }
+            ].map(({ type, color, textColor, label, count }) => (
+              <div key={type} className="flex items-center gap-1.5 text-xs">
+                <div className={`w-3 h-3 ${color} rounded shadow-sm`}></div>
+                <span className="font-medium text-gray-700">{label}</span>
+                <span className={`font-bold ${textColor}`}>{count}</span>
               </div>
             ))}
           </div>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#2563eb"/>
+  <path d="M256 64c-70.7 0-128 57.3-128 128 0 70.7 57.3 128 128 128s128-57.3 128-128c0-70.7-57.3-128-128-128zm0 208c-44.2 0-80-35.8-80-80s35.8-80 80-80 80 35.8 80 80-35.8 80-80 80z" fill="#fff"/>
+  <path d="M256 352c-88.4 0-160 71.6-160 160h320c0-88.4-71.6-160-160-160z" fill="#fff"/>
+  <text x="256" y="470" font-family="Arial" font-size="48" font-weight="bold" text-anchor="middle" fill="#2563eb">TS</text>
+</svg>
+

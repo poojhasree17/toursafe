@@ -5,19 +5,49 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://demo.supaba
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'demo-key';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'demo-service-key';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Use global to persist singleton across hot reloads in development
+declare global {
+  var __supabaseClient: ReturnType<typeof createClient> | undefined;
+  var __supabaseAdminClient: ReturnType<typeof createClient> | undefined;
+}
+
+// Regular client with proper singleton pattern using global
+function getSupabaseClient() {
+  if (!global.__supabaseClient) {
+    global.__supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: typeof window !== 'undefined',
+        autoRefreshToken: typeof window !== 'undefined',
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+        storageKey: 'supabase.auth.token',
+      },
+    });
+  }
+  return global.__supabaseClient;
+}
 
 // Service role client for server-side operations (use carefully!)
-export const supabaseAdmin = createClient(
-  supabaseUrl,
-  serviceRoleKey,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
+function getSupabaseAdminClient() {
+  if (!global.__supabaseAdminClient) {
+    global.__supabaseAdminClient = createClient(
+      supabaseUrl,
+      serviceRoleKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
   }
-);
+  return global.__supabaseAdminClient;
+}
+
+export const supabase = getSupabaseClient();
+export const supabaseAdmin = getSupabaseAdminClient();
+
+// Export the service role key for API routes that need it
+export { serviceRoleKey };
 
 // Mock data for demo when Supabase is not available
 export const mockData = {
