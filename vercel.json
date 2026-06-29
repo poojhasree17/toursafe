@@ -1,5 +1,6 @@
 {
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/apps/web/$1" }
-  ]
+  "installCommand": "pnpm install --no-frozen-lockfile",
+  "buildCommand": "pnpm --filter @toursafe/lib build && pnpm --filter @toursafe/ui build && pnpm --filter @toursafe/web build",
+  "outputDirectory": "apps/web/.next",
+  "framework": "nextjs"
 }
