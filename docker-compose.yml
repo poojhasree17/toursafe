@@ -19,10 +19,6 @@ services:
       - AI_SERVICE_URL=http://ai:8000
     depends_on:
       - ai
-    volumes:
-      - ./apps/web:/app
-      - /app/node_modules
-      - /app/.next
 
   ai:
     build:
