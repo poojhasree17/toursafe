@@ -2,351 +2,222 @@
 
 > **AI-powered tourist safety system with blockchain-verified credentials**
 
-A comprehensive MVP solution for SIH 2025 PS-25002, delivering end-to-end tourist safety monitoring with real-time GPS tracking, AI anomaly detection, geofencing alerts, and blockchain audit trails.
+A comprehensive solution for smart tourist safety monitoring with real-time GPS tracking, AI anomaly detection, geofencing alerts, and blockchain audit trails. Originally built for Hackthon.
 
-## 🚀 Quick Start
+---
 
+## 🚀 Quick Start (Windows)
+
+### Prerequisites
+- Node.js 18+
+- Python 3.11+
+- Docker Desktop
+- Git
+
+### Run Locally
+
+**Step 1 — Clone the repository:**
 ```bash
-# Install dependencies
-pnpm install
-
-# Set up environment (copy and fill in your keys)
-cp .env.template .env.local
-
-# Start development servers
-make dev
-
-# Seed database with demo data
-make seed
-
-# Run tourist simulation
-make simulate
+git clone https://github.com/poojhasree1711-design/toursafe.git
+cd toursafe
 ```
 
-## 🏗️ Architecture Overview
-
-```mermaid
-flowchart LR
-    TouristPWA[Tourist PWA] -->|GPS pings| API[Next.js API]
-    AdminDash[Admin Dashboard] --> API
-    API -->|PostGIS queries| DB[(Supabase)]
-    API -->|Realtime| AdminDash
-    API -->|Anomaly detection| AIMicro[FastAPI AI]
-    API -->|Push notifications| TouristPWA
-    VCIssuer[VC Issuer] --> API --> PolygonAmoy[(Polygon Amoy)]
+**Step 2 — Set up environment:**
+```bash
+copy .env.example .env.local
+# Fill in your API keys in .env.local
 ```
+
+**Step 3 — Start Docker Desktop, then run:**
+```bash
+docker-compose up --build
+```
+
+**Step 4 — Start Supabase database (new terminal):**
+```bash
+npx supabase start
+npx supabase db reset
+```
+
+**Step 5 — Open in browser:**
+```
+http://localhost:3000
+```
+
+### Demo Credentials
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@toursafe.demo | admin123 |
+| Operator | operator@toursafe.demo | operator123 |
+
+---
 
 ## 🎯 Key Features
 
 ### Tourist Safety App (PWA)
-- **📱 Progressive Web App** - Installable, works offline
-- **🔐 Verifiable Credentials** - Blockchain-anchored identity
-- **📍 GPS Tracking** - Real-time location with privacy controls
-- **🆘 SOS Button** - One-tap emergency alerts
-- **🗺️ Interactive Map** - Live zones and safety information
-- **🔔 Push Notifications** - Geofence warnings and alerts
-- **🌐 Multilingual** - English, Hindi, Tamil support
+- **📱 Progressive Web App** — Installable, works offline
+- **🔐 Verifiable Credentials** — Blockchain-anchored digital identity
+- **📍 GPS Tracking** — Real-time location with privacy controls
+- **🆘 SOS Button** — One-tap emergency alerts
+- **🗺️ Interactive Map** — Live safety zones and location info
+- **🔔 Push Notifications** — Geofence warnings and alerts
+- **🌐 Multilingual** — English, Hindi, Tamil support
 
-### Admin/Operator Dashboard
-- **📊 Real-time Monitoring** - Live tourist locations and incidents
-- **⚡ Incident Management** - Triage, assign, and resolve alerts
-- **🗺️ Zone Management** - Create and edit geofenced areas
-- **🔍 AI Analytics** - Anomaly detection and pattern analysis
-- **🔗 Blockchain Audit** - Verify credentials and incident integrity
-- **📈 Reporting** - Export data and incident reports
+### Admin / Operator Dashboard
+- **📊 Real-time Monitoring** — Live tourist locations and incidents
+- **⚡ Incident Management** — Triage, assign, and resolve alerts
+- **🗺️ Zone Management** — Create and edit geofenced areas
+- **🔍 AI Analytics** — Anomaly detection and pattern analysis
+- **🔗 Blockchain Audit** — Verify credentials and incident integrity
+- **📈 Reporting** — Export data and incident reports
 
 ### Police & Tourism Department Dashboard
-- **🚔 Real-time Visualizations** - Comprehensive monitoring with live updates
-- **👥 Tourist Clusters** - Grid-based clustering with density analysis
-- **🗺️ Risk Heat Maps** - Geographic visualization of high-risk zones
-- **🔍 Digital ID Records** - Advanced search, filtering, and tracking
-- **📍 Last Known Locations** - Real-time location tracking for all tourists
-- **📋 Alert History** - Complete incident log with full details
-- **⚡ Automated E-FIR** - One-click E-FIR generation for missing persons
-- **📊 Analytics Dashboard** - Statistics, trends, and insights
-- **📤 Data Export** - Export complete dashboard data for reports
+- **🚔 Real-time Visualizations** — Comprehensive live monitoring
+- **👥 Tourist Clusters** — Grid-based clustering with density analysis
+- **🗺️ Risk Heat Maps** — Geographic visualization of high-risk zones
+- **🔍 Digital ID Records** — Advanced search, filtering, and tracking
+- **📍 Last Known Locations** — Real-time location tracking for all tourists
+- **📋 Alert History** — Complete incident log with full details
+- **⚡ Automated E-FIR** — One-click E-FIR generation for missing persons
+- **📊 Analytics Dashboard** — Statistics, trends, and insights
+- **📤 Data Export** — Export complete dashboard data for reports
 
 ### AI Anomaly Detection
-- **🤖 Machine Learning** - IsolationForest for movement analysis
-- **📊 Rule-based Detection** - Immobility and deviation patterns
-- **⚡ Real-time Processing** - Sub-30-second analysis
-- **🎯 Configurable Alerts** - Tunable sensitivity and thresholds
+- **🤖 Machine Learning** — IsolationForest for movement analysis
+- **📊 Rule-based Detection** — Immobility and deviation patterns
+- **⚡ Real-time Processing** — Sub-30-second analysis
+- **🎯 Configurable Alerts** — Tunable sensitivity and thresholds
 
 ### Blockchain Integration
-- **🔗 Polygon Amoy Testnet** - Cost-effective proof anchoring
-- **📄 W3C VCs** - Standards-compliant credentials
-- **🔒 Tamper-proof** - Cryptographic integrity verification
-- **⚡ Fast Settlement** - 2-second block times
+- **🔗 Polygon Amoy Testnet** — Cost-effective proof anchoring
+- **📄 W3C Verifiable Credentials** — Standards-compliant credentials
+- **🔒 Tamper-proof** — Cryptographic integrity verification
+- **⚡ Fast Settlement** — 2-second block times
+
+---
+
+## 🏗️ Architecture
+
+```
+Tourist PWA  ──→  Next.js API  ──→  Supabase (PostgreSQL)
+                      │
+                      ├──→  FastAPI AI Service (Python)
+                      │
+                      └──→  Polygon Amoy (Blockchain)
+```
+
+---
 
 ## 🛠️ Tech Stack
 
-### Frontend & API
-- **Next.js 14** - App Router, Server Components, API Routes
-- **TypeScript** - Full type safety across the stack
-- **Tailwind + shadcn/ui** - Modern, accessible UI components
-- **MapLibre GL** - Interactive maps with OSM tiles
-- **React Query** - Data fetching and state management
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 14, TypeScript, Tailwind CSS, shadcn/ui |
+| Maps | MapLibre GL, MapTiler |
+| Backend | Next.js API Routes, Supabase |
+| Database | PostgreSQL + PostGIS (via Supabase) |
+| AI Service | Python, FastAPI, scikit-learn |
+| Blockchain | Polygon Amoy, ethers.js, W3C VCs |
+| Notifications | Firebase Cloud Messaging (FCM) |
+| Deployment | Vercel (web), Render (AI), Supabase Cloud (DB) |
 
-### Backend & Database  
-- **Supabase** - PostgreSQL with PostGIS, Auth, Realtime
-- **PostGIS** - Geospatial queries and indexing
-- **Row Level Security** - Fine-grained access control
-- **Real-time Subscriptions** - Live dashboard updates
-
-### AI & ML
-- **Python FastAPI** - High-performance AI microservice
-- **scikit-learn** - Anomaly detection algorithms
-- **NumPy/Pandas** - Data processing and analysis
-- **Docker** - Containerized deployment
-
-### Blockchain & Identity
-- **ethers.js** - Ethereum/Polygon interaction
-- **JOSE** - JWT signing and verification
-- **Polygon Amoy** - L2 testnet for cost efficiency
-
-### DevOps & Deployment
-- **Vercel** - Frontend and API hosting
-- **Render** - AI service deployment
-- **GitHub Actions** - CI/CD pipeline
-- **pnpm** - Fast, efficient package management
+---
 
 ## 📁 Project Structure
 
 ```
-toursafe-monorepo/
+toursafe/
 ├── apps/
-│   ├── web/                 # Next.js PWA + Dashboard
-│   ├── api/                 # Next.js API Routes (part of web)
-│   └── ai/                  # Python FastAPI Microservice
+│   ├── web/          # Next.js PWA + Admin Dashboard
+│   └── ai/           # Python FastAPI AI Microservice
 ├── packages/
-│   ├── ui/                  # Shared React components
-│   ├── lib/                 # Shared TypeScript utilities
-│   └── config/              # Shared configurations
-├── scripts/                 # Seeding and simulation tools
-├── supabase/               # Database migrations and config
-├── docs/                   # Documentation
+│   ├── ui/           # Shared React components
+│   ├── lib/          # Shared TypeScript utilities
+│   └── config/       # Shared configurations
+├── scripts/          # Seeding and simulation tools
+├── supabase/         # Database migrations and config
+├── docker-compose.yml
 └── README.md
 ```
 
-## 🚦 Getting Started
-
-### Prerequisites
-- Node.js 18+ and pnpm 8+
-- Python 3.11+ (for AI service)
-- Supabase account
-- MapTiler account (free tier)
-- Polygon wallet with test MATIC
-
-### Environment Setup
-
-1. **Copy environment template:**
-   ```bash
-   cp .env.template .env.local
-   ```
-
-2. **Fill in required keys:**
-   ```env
-   # Supabase (create project at supabase.com)
-   NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
-   SUPABASE_SERVICE_ROLE_KEY=xxx
-
-   # MapTiler (free tier at maptiler.com)
-   NEXT_PUBLIC_MAPTILER_KEY=xxx
-
-   # Polygon Amoy (get test MATIC from faucet)
-   AMOY_RPC_URL=https://rpc-amoy.polygon.technology
-   CHAIN_PRIVATE_KEY=0x...
-
-   # App config
-   NEXT_PUBLIC_APP_NAME=TourSafe
-   ```
-
-3. **Set up Supabase:**
-   ```bash
-   # Install Supabase CLI
-   npm i -g supabase
-
-   # Initialize and run migrations
-   cd supabase
-   supabase init
-   supabase db reset
-   ```
-
-### Development
-
-```bash
-# Install all dependencies
-pnpm install
-
-# Start all services in development mode
-make dev
-# This runs:
-# - Next.js web app on :3000
-# - Python AI service on :8000
-# - Supabase local instance on :54321
-
-# In separate terminals:
-make seed      # Populate demo data
-make simulate  # Run tourist movement simulation
-```
-
-### Testing
-
-```bash
-# Run all tests
-make test
-
-# Test specific services
-pnpm --filter web test        # Frontend tests
-pnpm --filter ai test         # Python tests
-pnpm run test-vc              # VC functionality
-pnpm run test-chain           # Blockchain integration
-```
-
-## 🔧 Configuration
-
-### Free Tier Limits & Setup
-
-| Service | Free Tier | Setup Guide |
-|---------|-----------|-------------|
-| **Vercel** | 100GB bandwidth | [Deploy Guide](docs/DEPLOY.md#vercel) |
-| **Supabase** | 500MB DB, 2GB bandwidth | [DB Setup](docs/FREE_TIER_SETUP.md#supabase) |
-| **Render** | 750 hours/month | [AI Service](docs/DEPLOY.md#render) |
-| **MapTiler** | 100k requests/month | [Maps Setup](docs/FREE_TIER_SETUP.md#maptiler) |
-| **Polygon** | Testnet (free) | [Faucet Guide](docs/FREE_TIER_SETUP.md#polygon) |
-
-### Security Configuration
-
-- **HTTPS Only** - All endpoints use TLS
-- **CORS** - Configured for production domains
-- **Rate Limiting** - API endpoints protected
-- **Input Validation** - Zod schemas on all inputs
-- **SQL Injection** - Parameterized queries only
-- **RLS Policies** - Database-level access control
-
-## 📋 API Documentation
-
-### Core Endpoints
-
-```http
-# VC Management
-POST /api/v1/vc/issue        # Issue new credential
-POST /api/v1/vc/verify       # Verify credential
-
-# Location & Safety
-POST /api/v1/ping            # Submit GPS location
-GET  /api/v1/zones           # Get safety zones
-POST /api/v1/zones           # Create safety zone
-
-# Incident Management  
-GET  /api/v1/incidents       # List incidents
-POST /api/v1/incidents       # Create incident (SOS)
-PATCH /api/v1/incidents/:id  # Update incident status
-
-# E-FIR System
-POST /api/v1/efir            # Generate E-FIR
-GET  /api/v1/efir            # Get E-FIRs by tourist
-PATCH /api/v1/efir           # Update E-FIR status
-
-# Police Dashboard
-GET  /api/v1/analytics       # Dashboard analytics
-GET  /api/v1/heatmap         # Risk heat map data
-GET  /api/v1/clusters        # Tourist clusters
-
-# AI Analysis
-POST /ai/score               # Analyze GPS patterns
-```
-
-See [API.md](docs/API.md) for detailed API documentation.
-
-For Police Dashboard documentation, see:
-- [POLICE_DASHBOARD.md](docs/POLICE_DASHBOARD.md) - Complete feature documentation
-- [POLICE_DASHBOARD_QUICK_REFERENCE.md](docs/POLICE_DASHBOARD_QUICK_REFERENCE.md) - Quick reference guide
+---
 
 ## 🎭 Demo Scenarios
 
 ### Scenario 1: Normal Tourism
-1. Tourist imports VC → ✅ Verified on blockchain
-2. Walks through safe zones → ✅ No alerts
-3. AI detects normal movement → ✅ No incidents
+1. Tourist imports Verifiable Credential → ✅ Verified on blockchain
+2. Walks through safe zones → ✅ No alerts triggered
+3. AI detects normal movement → ✅ No incidents created
 
 ### Scenario 2: Restricted Area Alert
-1. Tourist approaches naval area → ⚠️ Geofence warning
+1. Tourist approaches restricted area → ⚠️ Geofence warning sent
 2. Crosses boundary → 🚨 Incident auto-created
-3. Operator receives notification → 🔔 Dashboard alert
+3. Operator receives notification → 🔔 Dashboard alert shown
 
 ### Scenario 3: Immobility Detection
-1. Tourist stops moving for 6+ minutes → 🤖 AI detection
-2. Incident auto-created → 📞 Emergency protocol
+1. Tourist stops moving for 6+ minutes → 🤖 AI detects anomaly
+2. Incident auto-created → 📞 Emergency protocol triggered
 3. Operator acknowledges → ✅ Response initiated
 
 ### Scenario 4: SOS Emergency
-1. Tourist taps SOS button → 🆘 Manual alert
-2. GPS location captured → 📍 Precise coordinates
-3. Push notification sent → ⚡ Real-time response
-
-## 🚀 Deployment
-
-### Production Deployment
-
-1. **Deploy AI Service to Render:**
-   ```bash
-   # Connect GitHub repo to Render
-   # Use Dockerfile in apps/ai/
-   # Set environment variables
-   ```
-
-2. **Deploy Web App to Vercel:**
-   ```bash
-   vercel --prod
-   # Automatic deployment from main branch
-   ```
-
-3. **Configure Production Database:**
-   ```bash
-   # Run migrations on production Supabase
-   supabase db push
-   ```
-
-See [DEPLOY.md](docs/DEPLOY.md) for detailed deployment instructions.
-
-## 📊 Monitoring & Analytics
-
-- **Supabase Dashboard** - Database metrics and logs
-- **Vercel Analytics** - Performance and usage stats
-- **Custom Logging** - Structured JSON logs
-- **Error Tracking** - Real-time error alerts
-- **Performance Monitoring** - API response times
-
-## 🤝 Contributing
-
-This is a hackathon MVP, but contributions are welcome!
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🎖️ Hackathon Submission
-
-- **Event:** Smart India Hackathon 2025
-- **Problem Statement:** PS-25002 - Smart Tourist Safety & Incident Response
-- **Team:** [Your Team Name]
-- **Demo:** [Live Demo URL]
-- **Video:** [Demo Video URL]
-
-## 📞 Support
-
-- **Documentation:** [docs/](docs/)
-- **Issues:** [GitHub Issues](https://github.com/your-repo/issues)
-- **Email:** [your-email@example.com]
+1. Tourist taps SOS button → 🆘 Manual alert sent
+2. GPS location captured → 📍 Precise coordinates logged
+3. Push notification sent to operator → ⚡ Real-time response
 
 ---
 
-**Built with ❤️ for SIH 2025 | Ensuring safer travels through technology**
+## 🔧 Environment Variables
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Maps
+NEXT_PUBLIC_MAPTILER_KEY=your_maptiler_key
+
+# Firebase (Push Notifications)
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_key
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=your_vapid_key
+
+# Blockchain (Polygon Amoy)
+AMOY_RPC_URL=https://rpc-amoy.polygon.technology
+CHAIN_PRIVATE_KEY=your_wallet_private_key
+
+# AI Service
+AI_SERVICE_URL=http://localhost:8000
+
+# App
+NEXT_PUBLIC_APP_NAME=TourSafe
+NEXT_PUBLIC_DEFAULT_LOCALE=en
+```
+
+---
+
+## 🚀 Deployment
+
+| Service | Platform | Purpose |
+|---------|----------|---------|
+| Web App | Vercel | Frontend + API routes |
+| AI Service | Render | Python FastAPI microservice |
+| Database | Supabase Cloud | PostgreSQL + Auth + Realtime |
+
+> ⚠️ This is a demo system built for SIH HACKTHON 2025.
+> It is not a real emergency service. Do not use for actual emergencies.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+---
+
+## 📞 Contact
+
+- **GitHub:** [poojhasree1711-design](https://github.com/poojhasree1711-design)
+- **Project:** TourSafe — Smart Tourist Safety System
