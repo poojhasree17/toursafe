@@ -1,6 +1,0 @@
-{
-  "installCommand": "cd ../.. && pnpm install --no-frozen-lockfile",
-  "buildCommand": "cd ../.. && pnpm --filter @toursafe/lib build && pnpm --filter @toursafe/ui build && pnpm --filter @toursafe/web build",
-  "outputDirectory": ".next",
-  "framework": "nextjs"
-}
