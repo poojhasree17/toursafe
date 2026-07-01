@@ -182,7 +182,7 @@ export default function PoliceDashboard() {
 
       // Enrich with location data from pings table
       const touristsWithLocation = await Promise.all(
-        (data || []).map(async (tourist) => {
+        (data || []).map(async (tourist: any) => {
           const { data: locationData, error: locationError } = await supabase
             .from('pings')
             .select('lat, lng, ts')
