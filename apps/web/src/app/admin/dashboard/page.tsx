@@ -199,7 +199,7 @@ export default function PoliceDashboard() {
           return {
             ...tourist,
             last_location: locationData ? {
-              lat: locationData.lat,
+              lat: (locationData as any).lat,
               lng: locationData.lng,
               updated_at: locationData.ts
             } : null
