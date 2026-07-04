@@ -65,7 +65,7 @@ export default function HomePage() {
         {/* Demo Notice */}
         <div className="mt-16 p-6 bg-blue-50 rounded-lg text-center">
           <p className="text-blue-800 font-medium">
-            🚀 This is a demo system built for SIH 2025 PS-25002
+            🚀 This is a demo system built for HACKTHON-2025
           </p>
           <p className="text-blue-600 text-sm mt-2">
             Using free tiers: Vercel, Supabase, Render, Polygon Amoy testnet
