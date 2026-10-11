@@ -219,5 +219,5 @@ This project is licensed under the MIT License.
 
 ## 📞 Contact
 
-- **GitHub:** [poojhasree1711-design](https://github.com/poojhasree1711-design)
+- **GitHub:** https://github.com/poojhasree17
 - **Project:** TourSafe — Smart Tourist Safety System
